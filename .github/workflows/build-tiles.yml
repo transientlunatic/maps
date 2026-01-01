@@ -107,14 +107,11 @@ jobs:
           # Build shaded basemap
           make data/shaded-basemap.tif
           
-          # Note: Skipping overlays for now as they require external GeoJSON data
-          # To enable overlays, fetch forest.geojson and water.geojson first
-          
           # Reproject to Web Mercator
           make data/shaded-basemap-3857.tif
           
-          # Generate tiles
-          make TILE_ZOOMS=0-13 data/tiles
+          # Generate tiles (without overlays since they require external GeoJSON data)
+          make basemap-tiles-no-overlays TILE_ZOOMS=0-13
         timeout-minutes: 240
       
       - name: List generated tiles

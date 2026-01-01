@@ -24,12 +24,7 @@ def csv_to_geojson(input_csv, output_geojson, lat_col, lon_col, name_col=None):
     """
     features = []
     
-    with open(input_csv, 'r', encoding='utf-8') as f:
-        # Skip BOM if present
-        first_char = f.read(1)
-        if first_char != '\ufeff':
-            f.seek(0)
-        
+    with open(input_csv, 'r', encoding='utf-8-sig') as f:
         reader = csv.DictReader(f)
         
         for row in reader:

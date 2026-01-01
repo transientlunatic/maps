@@ -11,6 +11,10 @@ import sys
 import subprocess
 import os
 
+# Import qml_color module
+sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
+import qml_color
+
 
 def run_command(cmd, description=""):
     """Run a shell command and check for errors."""
@@ -26,8 +30,20 @@ def run_command(cmd, description=""):
 
 def get_qml_color(qml_file):
     """Extract R, G, B, Alpha from QML file."""
-    result = run_command(['python3', 'scripts/qml_color.py', qml_file], "")
-    parts = result.strip().split()
+    # Use a temporary stdout capture to get the output
+    import io
+    old_stdout = sys.stdout
+    sys.stdout = buffer = io.StringIO()
+    
+    try:
+        result = qml_color.parse_qml(qml_file)
+        if result != 0:
+            sys.exit(1)
+        output = buffer.getvalue()
+    finally:
+        sys.stdout = old_stdout
+    
+    parts = output.strip().split()
     return {
         'r': int(parts[0]),
         'g': int(parts[1]),
