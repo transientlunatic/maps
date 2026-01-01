@@ -188,26 +188,7 @@ data/overlays/forest_effective_mask.tif: data/overlays/forest_mask.tif data/over
 
 # Blend overlays into the shaded basemap using colors from QML
 data/shaded-basemap-overlays.tif: data/shaded-basemap.tif data/overlays/forest_effective_mask.tif data/overlays/water_mask.tif $(FOREST_QML) $(WATER_QML)
-	@echo "Extracting colors from QMLs"
-	@read r_fg g_fg a_fg < <(python3 scripts/qml_color.py "$(FOREST_QML)"); \
-	read r_w g_w a_w < <(python3 scripts/qml_color.py "$(WATER_QML)"); \
-	@echo Forest: $$r_fg $$g_fg $$a_fg; echo Water: $$r_w $$g_w $$a_w; \
-	mkdir -p $(dir $@) data/tmp; \
-	# per-band blend: final = ((1-W)*base + W*water) * (1 - F*a_fg) + (F*a_fg)*forest
-	# band 1
-	gdal_calc.py -A data/shaded-basemap.tif --A_band=1 -B data/overlays/water_mask.tif -C data/overlays/forest_effective_mask.tif --outfile=data/tmp/out_b1.tif --calc="((1-B)*A + B*$(shell python3 -c 'print(int($(python3 scripts/qml_color.py "$(WATER_QML)".split()[0])) if False else 0)'))*(1 - C*$(shell python3 -c 'print(float(0))')) + (C*$(shell python3 -c 'print(float(0))'))*$(shell python3 -c 'print(int(0))')" --type=Byte || true
-	# NOTE: fallback simple approach: paint water then forest using masks
-	gdal_calc.py -A data/shaded-basemap.tif --A_band=1 -B data/overlays/water_mask.tif --outfile=data/tmp/step_b1.tif --calc="(1-B)*A + B*$(shell python3 -c 'import sys,subprocess; print(subprocess.check_output(["python3","scripts/qml_color.py","""$(WATER_QML)""" ]).decode().split()[0])')" --type=Byte --overwrite
-	gdal_calc.py -A data/tmp/step_b1.tif --A_band=1 -B data/overlays/forest_effective_mask.tif --outfile=data/tmp/final_b1.tif --calc="(1 - B*$(shell python3 scripts/qml_color.py "$(FOREST_QML)" | awk '{print $$4}'))*A + B*$(shell python3 scripts/qml_color.py "$(FOREST_QML)" | awk '{print $$1}')" --type=Byte --overwrite
-	# band 2
-	gdal_calc.py -A data/shaded-basemap.tif --A_band=2 -B data/overlays/water_mask.tif --outfile=data/tmp/step_b2.tif --calc="(1-B)*A + B*$(shell python3 scripts/qml_color.py "$(WATER_QML)" | awk '{print $$2}')" --type=Byte --overwrite
-	gdal_calc.py -A data/tmp/step_b2.tif --A_band=1 -B data/overlays/forest_effective_mask.tif --outfile=data/tmp/final_b2.tif --calc="(1 - B*$(shell python3 scripts/qml_color.py "$(FOREST_QML)" | awk '{print $$4}'))*A + B*$(shell python3 scripts/qml_color.py "$(FOREST_QML)" | awk '{print $$2}')" --type=Byte --overwrite
-	# band 3
-	gdal_calc.py -A data/shaded-basemap.tif --A_band=3 -B data/overlays/water_mask.tif --outfile=data/tmp/step_b3.tif --calc="(1-B)*A + B*$(shell python3 scripts/qml_color.py "$(WATER_QML)" | awk '{print $$3}')" --type=Byte --overwrite
-	gdal_calc.py -A data/tmp/step_b3.tif --A_band=1 -B data/overlays/forest_effective_mask.tif --outfile=data/tmp/final_b3.tif --calc="(1 - B*$(shell python3 scripts/qml_color.py "$(FOREST_QML)" | awk '{print $$4}'))*A + B*$(shell python3 scripts/qml_color.py "$(FOREST_QML)" | awk '{print $$3}')" --type=Byte --overwrite
-
-	gdal_merge.py -separate -o $@ data/tmp/final_b1.tif data/tmp/final_b2.tif data/tmp/final_b3.tif
-	gdal_translate -co COMPRESS=LZW -co TILED=YES $@ $@.tmp && mv $@.tmp $@
+	python3 scripts/blend_overlay.py $< data/overlays/water_mask.tif data/overlays/forest_effective_mask.tif $(WATER_QML) $(FOREST_QML) $@
 
 # Reproject the overlayed shaded basemap for tiling
 data/shaded-basemap-overlays-3857.tif: data/shaded-basemap-overlays.tif
@@ -254,9 +235,9 @@ data/tiles/sample: data/shaded-basemap-sample-overlays.tif
 
 # Sample overlay targets (aligned to sample shaded basemap)
 
-data/overlays/forest_mask-sample.tif: $(FOREST_GEOJSON) data/shaded-basemap-sample-1400.tif
+data/overlays/forest_mask-sample.tif: $(FOREST_GEOJSON) data/shaded-basemap-sample.tif
 	@echo "Rasterizing forest overlay (sample) to $@ aligned with shaded sample basemap"
-	@info=$$(gdalinfo -json data/shaded-basemap-sample-1400.tif); \
+	@info=$$(gdalinfo -json data/shaded-basemap-sample.tif); \
 	 xmin=$$(echo "$$info" | jq -r '.cornerCoordinates.upperLeft[0]'); \
 	 ymax=$$(echo "$$info" | jq -r '.cornerCoordinates.upperLeft[1]'); \
 	 xmax=$$(echo "$$info" | jq -r '.cornerCoordinates.lowerRight[0]'); \
@@ -267,9 +248,9 @@ data/overlays/forest_mask-sample.tif: $(FOREST_GEOJSON) data/shaded-basemap-samp
 	gdal_rasterize -burn 1 -ot Byte -co COMPRESS=LZW -te $$xmin $$ymin $$xmax $$ymax -ts $$xs $$ys -a_nodata 0 "$(FOREST_GEOJSON)" $@
 
 
-data/overlays/water_mask-sample.tif: $(WATER_GEOJSON) data/shaded-basemap-sample-1400.tif
+data/overlays/water_mask-sample.tif: $(WATER_GEOJSON) data/shaded-basemap-sample.tif
 	@echo "Rasterizing water overlay (sample) to $@ aligned with shaded sample basemap"
-	@info=$$(gdalinfo -json data/shaded-basemap-sample-1400.tif); \
+	@info=$$(gdalinfo -json data/shaded-basemap-sample.tif); \
 	 xmin=$$(echo "$$info" | jq -r '.cornerCoordinates.upperLeft[0]'); \
 	 ymax=$$(echo "$$info" | jq -r '.cornerCoordinates.upperLeft[1]'); \
 	 xmax=$$(echo "$$info" | jq -r '.cornerCoordinates.lowerRight[0]'); \
@@ -283,22 +264,8 @@ data/overlays/forest_effective_mask-sample.tif: data/overlays/forest_mask-sample
 	@gdal_calc.py -A data/overlays/forest_mask-sample.tif -B data/overlays/water_mask-sample.tif --outfile=$@ --calc="A*(1-B)" --type=Byte --overwrite
 
 
-data/shaded-basemap-sample-overlays.tif: data/shaded-basemap-sample-1400.tif data/overlays/forest_effective_mask-sample.tif data/overlays/water_mask-sample.tif $(FOREST_QML) $(WATER_QML)
-	@echo "Extracting colors from QMLs (sample)"
-	@read r_fg g_fg a_fg < <(python3 scripts/qml_color.py "$(FOREST_QML)"); \
-	read r_w g_w a_w < <(python3 scripts/qml_color.py "$(WATER_QML)"); \
-	@echo Forest: $$r_fg $$g_fg $$a_fg; echo Water: $$r_w $$g_w $$a_w; \
-	mkdir -p $(dir $@) data/tmp; \
-	# Paint water then forest onto the sample shaded basemap using masks and QML colours
-	gdal_calc.py -A data/shaded-basemap-sample-1400.tif --A_band=1 -B data/overlays/water_mask-sample.tif --outfile=data/tmp/step_b1.tif --calc="(1-B)*A + B*$(shell python3 scripts/qml_color.py "$(WATER_QML)" | awk '{print $$1}')" --type=Byte --overwrite
-	gdal_calc.py -A data/tmp/step_b1.tif --A_band=1 -B data/overlays/forest_effective_mask-sample.tif --outfile=data/tmp/final_b1.tif --calc="(1 - B*$(shell python3 scripts/qml_color.py "$(FOREST_QML)" | awk '{print $$4}'))*A + B*$(shell python3 scripts/qml_color.py "$(FOREST_QML)" | awk '{print $$1}')" --type=Byte --overwrite
-	gdal_calc.py -A data/shaded-basemap-sample-1400.tif --A_band=2 -B data/overlays/water_mask-sample.tif --outfile=data/tmp/step_b2.tif --calc="(1-B)*A + B*$(shell python3 scripts/qml_color.py "$(WATER_QML)" | awk '{print $$2}')" --type=Byte --overwrite
-	gdal_calc.py -A data/tmp/step_b2.tif --A_band=1 -B data/overlays/forest_effective_mask-sample.tif --outfile=data/tmp/final_b2.tif --calc="(1 - B*$(shell python3 scripts/qml_color.py "$(FOREST_QML)" | awk '{print $$4}'))*A + B*$(shell python3 scripts/qml_color.py "$(FOREST_QML)" | awk '{print $$2}')" --type=Byte --overwrite
-	gdal_calc.py -A data/shaded-basemap-sample-1400.tif --A_band=3 -B data/overlays/water_mask-sample.tif --outfile=data/tmp/step_b3.tif --calc="(1-B)*A + B*$(shell python3 scripts/qml_color.py "$(WATER_QML)" | awk '{print $$3}')" --type=Byte --overwrite
-	gdal_calc.py -A data/tmp/step_b3.tif --A_band=1 -B data/overlays/forest_effective_mask-sample.tif --outfile=data/tmp/final_b3.tif --calc="(1 - B*$(shell python3 scripts/qml_color.py "$(FOREST_QML)" | awk '{print $$4}'))*A + B*$(shell python3 scripts/qml_color.py "$(FOREST_QML)" | awk '{print $$3}')" --type=Byte --overwrite
-
-	gdal_merge.py -separate -o $@ data/tmp/final_b1.tif data/tmp/final_b2.tif data/tmp/final_b3.tif
-	gdal_translate -co COMPRESS=LZW -co TILED=YES $@ $@.tmp && mv $@.tmp $@
+data/shaded-basemap-sample-overlays.tif: data/shaded-basemap-sample.tif data/overlays/forest_effective_mask-sample.tif data/overlays/water_mask-sample.tif $(FOREST_QML) $(WATER_QML)
+	python3 scripts/blend_overlay.py $< data/overlays/water_mask-sample.tif data/overlays/forest_effective_mask-sample.tif $(WATER_QML) $(FOREST_QML) $@
 
 
 # Remove generated products (safe clean)
