@@ -122,20 +122,6 @@ data/merged-3857.vrt: data/merged.vrt
 	# Reproject into Web Mercator as a VRT (no large disk raster created)
 	gdalwarp -of VRT -t_srs EPSG:3857 -r bilinear $< $@
 
-
-# Generate tiles from the projected VRT (saves disk compared to a full TIFF)
-data/tiles: data/shaded-basemap-3857.tif
-	mkdir -p $(TILE_OUTPUT_DIR)
-	gdal2tiles.py \
-		-p mercator \
-		-z $(TILE_ZOOMS) \
-		-w all \
-		--processes=$(GDAL2TILES_PROCS) \
-		--xyz \
-		-r average \
-		-a 0.0 \
-		$< $(TILE_OUTPUT_DIR)
-
 # Build a shaded RGB basemap from the merged DEM (full-resolution)
 data/shaded-basemap.tif: data/merged-dem.tif data/hill-shade-merged.tif data/hillmap-colors.txt
 	mkdir -p $(dir $@) data/tmp
@@ -153,8 +139,8 @@ data/shaded-basemap.tif: data/merged-dem.tif data/hill-shade-merged.tif data/hil
 data/shaded-basemap-3857.tif: data/shaded-basemap.tif
 	gdalwarp -of GTiff -t_srs EPSG:3857 -r bilinear -co COMPRESS=LZW -co TILED=YES $< $@
 
-# Convenience target to generate tiles from the shaded basemap (full)
-shaded-tiles: data/shaded-basemap-3857.tif
+# Convenience target to generate tiles from the shaded basemap without overlays
+basemap-tiles-no-overlays: data/shaded-basemap-3857.tif
 	mkdir -p $(TILE_OUTPUT_DIR)
 	gdal2tiles.py \
 		-p mercator \
