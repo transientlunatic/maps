@@ -1,0 +1,174 @@
+name: Build Map Tiles
+
+on:
+  # Build sample tiles on every push
+  push:
+    branches:
+      - main
+      - master
+  
+  # Build full tiles on releases
+  release:
+    types: [published]
+  
+  # Allow manual workflow dispatch with choice of tile set
+  workflow_dispatch:
+    inputs:
+      tile_set:
+        description: 'Which tile set to build'
+        required: true
+        default: 'sample'
+        type: choice
+        options:
+          - sample
+          - full
+
+jobs:
+  build-tiles:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            gdal-bin \
+            python3-gdal \
+            jq \
+            wget \
+            curl \
+            unzip
+      
+      - name: Install tippecanoe for vector tiles
+        run: |
+          git clone https://github.com/felt/tippecanoe.git /tmp/tippecanoe
+          cd /tmp/tippecanoe
+          make -j
+          sudo make install
+      
+      - name: Determine tile set to build
+        id: determine_tileset
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "tileset=full" >> $GITHUB_OUTPUT
+            echo "Building full Scotland tile set for release"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tileset=${{ github.event.inputs.tile_set }}" >> $GITHUB_OUTPUT
+            echo "Building ${{ github.event.inputs.tile_set }} tile set (manual trigger)"
+          else
+            echo "tileset=sample" >> $GITHUB_OUTPUT
+            echo "Building sample tile set for push"
+          fi
+      
+      - name: Generate point data GeoJSON files
+        run: |
+          make geojson
+      
+      - name: Generate point tiles (vector tiles)
+        run: |
+          make point-tiles
+      
+      - name: Download HGT elevation tiles (sample)
+        if: steps.determine_tileset.outputs.tileset == 'sample'
+        run: |
+          make AREA=sample hgt
+      
+      - name: Download HGT elevation tiles (full UK)
+        if: steps.determine_tileset.outputs.tileset == 'full'
+        run: |
+          make AREA=uk hgt
+        timeout-minutes: 60
+      
+      - name: Build sample basemap tiles
+        if: steps.determine_tileset.outputs.tileset == 'sample'
+        run: |
+          make sample
+        timeout-minutes: 30
+      
+      - name: Build full UK basemap tiles
+        if: steps.determine_tileset.outputs.tileset == 'full'
+        run: |
+          # Build merged DEM
+          make data/merged-dem.tif
+          
+          # Build hillshade
+          make data/hill-shade-merged.tif
+          
+          # Build shaded basemap
+          make data/shaded-basemap.tif
+          
+          # Note: Skipping overlays for now as they require external GeoJSON data
+          # To enable overlays, fetch forest.geojson and water.geojson first
+          
+          # Reproject to Web Mercator
+          make data/shaded-basemap-3857.tif
+          
+          # Generate tiles
+          make TILE_ZOOMS=0-13 data/tiles
+        timeout-minutes: 240
+      
+      - name: List generated tiles
+        run: |
+          echo "=== Generated tiles ==="
+          du -sh data/tiles/* 2>/dev/null || echo "No basemap tiles generated"
+          ls -lh data/points/*.geojson 2>/dev/null || echo "No GeoJSON files"
+          ls -lh data/tiles/*.mbtiles 2>/dev/null || echo "No vector tiles"
+      
+      - name: Upload sample tiles as artifact
+        if: steps.determine_tileset.outputs.tileset == 'sample'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sample-tiles
+          path: |
+            data/tiles/sample/**
+            data/points/*.geojson
+            data/tiles/*.mbtiles
+          retention-days: 30
+      
+      - name: Upload full tiles as artifact
+        if: steps.determine_tileset.outputs.tileset == 'full'
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-tiles-${{ github.sha }}
+          path: |
+            data/tiles/full/**
+            data/points/*.geojson
+            data/tiles/*.mbtiles
+          retention-days: 90
+      
+      - name: Create release assets
+        if: github.event_name == 'release'
+        run: |
+          cd data/tiles
+          tar -czf ../../basemap-tiles.tar.gz full/
+          cd ../points
+          tar -czf ../../point-data.tar.gz *.geojson
+          cd ../../
+          if [ -f data/tiles/trig-points.mbtiles ]; then
+            cp data/tiles/trig-points.mbtiles trig-points.mbtiles
+          fi
+          if [ -f data/tiles/hills.mbtiles ]; then
+            cp data/tiles/hills.mbtiles hills.mbtiles
+          fi
+      
+      - name: Upload release assets
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            basemap-tiles.tar.gz
+            point-data.tar.gz
+            trig-points.mbtiles
+            hills.mbtiles
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

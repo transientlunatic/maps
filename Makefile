@@ -22,7 +22,7 @@ HGT_BASE_URL ?= https://viewfinderpanoramas.org/dem3
 HGT_NAMES = $(shell sed '/^\s*$$/d' $(HGT_LIST) | sed 's@^.*/@@')
 HGT_FILES = $(patsubst %, $(HGT_DIR)/%, $(HGT_NAMES))
 
-.PHONY: all hgt uk sample tiles clean distclean apply-styles export-styles export-styles-force
+.PHONY: all hgt uk sample tiles clean distclean apply-styles export-styles export-styles-force geojson point-tiles
 
 PROJECT ?= projects/basemap.qgz
 
@@ -39,6 +39,16 @@ WATER_QML ?= styling/OSM - Water.qml
 # Overlay geojsons (fetch with scripts/fetch_overpass_geojson.py)
 FOREST_GEOJSON ?= data/overlays/forest.geojson
 WATER_GEOJSON ?= data/overlays/water.geojson
+
+# Point data sources and outputs
+TRIG_POINTS_CSV ?= sources/trigs.csv
+HILLS_CSV ?= sources/dobih.csv
+TRIG_POINTS_GEOJSON ?= data/points/trig-points.geojson
+HILLS_GEOJSON ?= data/points/hills.geojson
+
+# QML style files for point layers
+TRIG_POINTS_QML ?= styling/Trig Points.qml
+HILLS_QML ?= styling/Database of British and Irish Hills.qml
 
 all: data/merged-dem.tif
 
@@ -292,3 +302,66 @@ export-styles:
 
 export-styles-force:
 	python3 scripts/export_styles.py --force $(PROJECT) styling
+
+# ============================================================================
+# Point data (hills and trig points) tile generation
+# ============================================================================
+
+# Convert CSV files to GeoJSON
+$(TRIG_POINTS_GEOJSON): $(TRIG_POINTS_CSV)
+	mkdir -p $(dir $@)
+	python3 scripts/csv_to_geojson.py $< $@ --lat-col lat --lon-col long --name-col tp_name
+
+$(HILLS_GEOJSON): $(HILLS_CSV)
+	mkdir -p $(dir $@)
+	python3 scripts/csv_to_geojson.py $< $@ --lat-col Latitude --lon-col Longitude --name-col Name
+
+# Convenience target to generate all GeoJSON files
+geojson: $(TRIG_POINTS_GEOJSON) $(HILLS_GEOJSON)
+
+# Generate MBTiles from GeoJSON for web mapping
+# Note: This requires tippecanoe to be installed
+# For systems without tippecanoe, the GeoJSON can be served directly by web mapping libraries
+data/tiles/trig-points.mbtiles: $(TRIG_POINTS_GEOJSON)
+	@if command -v tippecanoe >/dev/null 2>&1; then \
+		mkdir -p $(dir $@); \
+		tippecanoe -o $@ -z 13 -Z 7 -r1 --drop-densest-as-needed \
+			--name="Trig Points" \
+			--layer=trig-points \
+			--minimum-zoom=7 \
+			--maximum-zoom=13 \
+			--no-tile-compression \
+			$(TRIG_POINTS_GEOJSON); \
+	else \
+		echo "WARNING: tippecanoe not found. Skipping vector tile generation."; \
+		echo "To generate vector tiles, install tippecanoe: https://github.com/felt/tippecanoe"; \
+		echo "Alternatively, use the GeoJSON file directly with Leaflet or other web mapping libraries."; \
+	fi
+
+data/tiles/hills.mbtiles: $(HILLS_GEOJSON)
+	@if command -v tippecanoe >/dev/null 2>&1; then \
+		mkdir -p $(dir $@); \
+		tippecanoe -o $@ -z 13 -Z 7 -r1 --drop-densest-as-needed \
+			--name="Database of British and Irish Hills" \
+			--layer=hills \
+			--minimum-zoom=7 \
+			--maximum-zoom=13 \
+			--no-tile-compression \
+			$(HILLS_GEOJSON); \
+	else \
+		echo "WARNING: tippecanoe not found. Skipping vector tile generation."; \
+		echo "To generate vector tiles, install tippecanoe: https://github.com/felt/tippecanoe"; \
+		echo "Alternatively, use the GeoJSON file directly with Leaflet or other web mapping libraries."; \
+	fi
+
+# Convenience target to generate point tiles (or just GeoJSON if tippecanoe unavailable)
+point-tiles: geojson
+	@if command -v tippecanoe >/dev/null 2>&1; then \
+		$(MAKE) data/tiles/trig-points.mbtiles data/tiles/hills.mbtiles; \
+	else \
+		echo "Point data available as GeoJSON in data/points/"; \
+		echo "Install tippecanoe to generate vector tiles."; \
+	fi
+
+# Target to build all three tile sets
+all-tiles: data/tiles point-tiles
