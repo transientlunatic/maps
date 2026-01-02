@@ -93,6 +93,38 @@ jobs:
           make AREA=uk hgt
         timeout-minutes: 60
       
+      - name: Download OSM forest data (sample)
+        if: steps.determine_tileset.outputs.tileset == 'sample'
+        run: |
+          mkdir -p data/overlays
+          # Sample area bbox (approximate small area in Scotland)
+          python3 scripts/fetch_overpass_geojson.py forest 56.0 -5.0 57.0 -4.0 data/overlays/forest.geojson
+        timeout-minutes: 10
+      
+      - name: Download OSM water data (sample)
+        if: steps.determine_tileset.outputs.tileset == 'sample'
+        run: |
+          mkdir -p data/overlays
+          # Sample area bbox (approximate small area in Scotland)
+          python3 scripts/fetch_overpass_geojson.py water 56.0 -5.0 57.0 -4.0 data/overlays/water.geojson
+        timeout-minutes: 10
+      
+      - name: Download OSM forest data (full UK)
+        if: steps.determine_tileset.outputs.tileset == 'full'
+        run: |
+          mkdir -p data/overlays
+          # Full Scotland bbox (approximate)
+          python3 scripts/fetch_overpass_geojson.py forest 54.5 -8.0 61.0 -0.5 data/overlays/forest.geojson
+        timeout-minutes: 30
+      
+      - name: Download OSM water data (full UK)
+        if: steps.determine_tileset.outputs.tileset == 'full'
+        run: |
+          mkdir -p data/overlays
+          # Full Scotland bbox (approximate)
+          python3 scripts/fetch_overpass_geojson.py water 54.5 -8.0 61.0 -0.5 data/overlays/water.geojson
+        timeout-minutes: 30
+      
       - name: Build sample basemap tiles
         if: steps.determine_tileset.outputs.tileset == 'sample'
         run: |
@@ -111,11 +143,19 @@ jobs:
           # Build shaded basemap
           make data/shaded-basemap.tif
           
-          # Reproject to Web Mercator
-          make data/shaded-basemap-3857.tif
+          # Build overlays with OSM data
+          make data/overlays/forest_mask.tif
+          make data/overlays/water_mask.tif
+          make data/overlays/forest_effective_mask.tif
           
-          # Generate tiles (without overlays since they require external GeoJSON data)
-          make basemap-tiles-no-overlays TILE_ZOOMS=0-13
+          # Blend overlays
+          make data/shaded-basemap-overlays.tif
+          
+          # Reproject to Web Mercator
+          make data/shaded-basemap-overlays-3857.tif
+          
+          # Generate tiles with overlays
+          make TILE_ZOOMS=0-13 data/tiles
         timeout-minutes: 240
       
       - name: List generated tiles
@@ -151,9 +191,14 @@ jobs:
         if: github.event_name == 'release'
         run: |
           cd data/tiles
-          tar -czf ../../basemap-tiles.tar.gz full/
+          if [ -d full ]; then
+            tar -czf ../../basemap-tiles.tar.gz full/
+          else
+            echo "No full basemap tiles directory found; creating empty basemap-tiles.tar.gz"
+            tar -czf ../../basemap-tiles.tar.gz --files-from /dev/null
+          fi
           cd ../points
-          tar -czf ../../point-data.tar.gz *.geojson
+          tar --ignore-failed-read -czf ../../point-data.tar.gz *.geojson
           cd ../../
           if [ -f data/tiles/trig-points.mbtiles ]; then
             cp data/tiles/trig-points.mbtiles trig-points.mbtiles

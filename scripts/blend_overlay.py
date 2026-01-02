@@ -44,12 +44,27 @@ def get_qml_color(qml_file):
         sys.stdout = old_stdout
     
     parts = output.strip().split()
-    return {
-        'r': int(parts[0]),
-        'g': int(parts[1]),
-        'b': int(parts[2]),
-        'a': float(parts[3])
-    }
+    if len(parts) < 4:
+        print(
+            f"ERROR: Expected at least 4 whitespace-separated values (R G B A) from QML '{qml_file}', "
+            f"but got: {output!r}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    try:
+        return {
+            'r': int(parts[0]),
+            'g': int(parts[1]),
+            'b': int(parts[2]),
+            'a': float(parts[3]),
+        }
+    except ValueError as exc:
+        print(
+            f"ERROR: Failed to parse numeric color components from QML '{qml_file}': {exc}. "
+            f"Raw output was: {output!r}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 
 def blend_overlays(basemap, water_mask, forest_mask, water_qml, forest_qml, output):

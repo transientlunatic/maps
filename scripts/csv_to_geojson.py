@@ -35,10 +35,6 @@ def csv_to_geojson(input_csv, output_geojson, lat_col, lon_col, name_col=None):
                 # Create properties from all columns
                 properties = dict(row)
                 
-                # Add name property if specified
-                if name_col and name_col in row:
-                    properties['name'] = row[name_col]
-                
                 feature = {
                     "type": "Feature",
                     "geometry": {
