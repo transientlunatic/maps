@@ -22,7 +22,7 @@ HGT_BASE_URL ?= https://viewfinderpanoramas.org/dem3
 HGT_NAMES = $(shell sed '/^\s*$$/d' $(HGT_LIST) | sed 's@^.*/@@')
 HGT_FILES = $(patsubst %, $(HGT_DIR)/%, $(HGT_NAMES))
 
-.PHONY: all hgt uk sample tiles clean distclean apply-styles export-styles export-styles-force
+.PHONY: all hgt uk sample tiles clean distclean apply-styles export-styles export-styles-force geojson point-tiles
 
 PROJECT ?= projects/basemap.qgz
 
@@ -39,6 +39,16 @@ WATER_QML ?= styling/OSM - Water.qml
 # Overlay geojsons (fetch with scripts/fetch_overpass_geojson.py)
 FOREST_GEOJSON ?= data/overlays/forest.geojson
 WATER_GEOJSON ?= data/overlays/water.geojson
+
+# Point data sources and outputs
+TRIG_POINTS_CSV ?= sources/trigs.csv
+HILLS_CSV ?= sources/dobih.csv
+TRIG_POINTS_GEOJSON ?= data/points/trig-points.geojson
+HILLS_GEOJSON ?= data/points/hills.geojson
+
+# QML style files for point layers
+TRIG_POINTS_QML ?= styling/Trig Points.qml
+HILLS_QML ?= styling/Database of British and Irish Hills.qml
 
 all: data/merged-dem.tif
 
@@ -112,20 +122,6 @@ data/merged-3857.vrt: data/merged.vrt
 	# Reproject into Web Mercator as a VRT (no large disk raster created)
 	gdalwarp -of VRT -t_srs EPSG:3857 -r bilinear $< $@
 
-
-# Generate tiles from the projected VRT (saves disk compared to a full TIFF)
-data/tiles: data/shaded-basemap-3857.tif
-	mkdir -p $(TILE_OUTPUT_DIR)
-	gdal2tiles.py \
-		-p mercator \
-		-z $(TILE_ZOOMS) \
-		-w all \
-		--processes=$(GDAL2TILES_PROCS) \
-		--xyz \
-		-r average \
-		-a 0.0 \
-		$< $(TILE_OUTPUT_DIR)
-
 # Build a shaded RGB basemap from the merged DEM (full-resolution)
 data/shaded-basemap.tif: data/merged-dem.tif data/hill-shade-merged.tif data/hillmap-colors.txt
 	mkdir -p $(dir $@) data/tmp
@@ -143,8 +139,8 @@ data/shaded-basemap.tif: data/merged-dem.tif data/hill-shade-merged.tif data/hil
 data/shaded-basemap-3857.tif: data/shaded-basemap.tif
 	gdalwarp -of GTiff -t_srs EPSG:3857 -r bilinear -co COMPRESS=LZW -co TILED=YES $< $@
 
-# Convenience target to generate tiles from the shaded basemap (full)
-shaded-tiles: data/shaded-basemap-3857.tif
+# Convenience target to generate tiles from the shaded basemap without overlays
+basemap-tiles-no-overlays: data/shaded-basemap-3857.tif
 	mkdir -p $(TILE_OUTPUT_DIR)
 	gdal2tiles.py \
 		-p mercator \
@@ -188,26 +184,7 @@ data/overlays/forest_effective_mask.tif: data/overlays/forest_mask.tif data/over
 
 # Blend overlays into the shaded basemap using colors from QML
 data/shaded-basemap-overlays.tif: data/shaded-basemap.tif data/overlays/forest_effective_mask.tif data/overlays/water_mask.tif $(FOREST_QML) $(WATER_QML)
-	@echo "Extracting colors from QMLs"
-	@read r_fg g_fg a_fg < <(python3 scripts/qml_color.py "$(FOREST_QML)"); \
-	read r_w g_w a_w < <(python3 scripts/qml_color.py "$(WATER_QML)"); \
-	@echo Forest: $$r_fg $$g_fg $$a_fg; echo Water: $$r_w $$g_w $$a_w; \
-	mkdir -p $(dir $@) data/tmp; \
-	# per-band blend: final = ((1-W)*base + W*water) * (1 - F*a_fg) + (F*a_fg)*forest
-	# band 1
-	gdal_calc.py -A data/shaded-basemap.tif --A_band=1 -B data/overlays/water_mask.tif -C data/overlays/forest_effective_mask.tif --outfile=data/tmp/out_b1.tif --calc="((1-B)*A + B*$(shell python3 -c 'print(int($(python3 scripts/qml_color.py "$(WATER_QML)".split()[0])) if False else 0)'))*(1 - C*$(shell python3 -c 'print(float(0))')) + (C*$(shell python3 -c 'print(float(0))'))*$(shell python3 -c 'print(int(0))')" --type=Byte || true
-	# NOTE: fallback simple approach: paint water then forest using masks
-	gdal_calc.py -A data/shaded-basemap.tif --A_band=1 -B data/overlays/water_mask.tif --outfile=data/tmp/step_b1.tif --calc="(1-B)*A + B*$(shell python3 -c 'import sys,subprocess; print(subprocess.check_output(["python3","scripts/qml_color.py","""$(WATER_QML)""" ]).decode().split()[0])')" --type=Byte --overwrite
-	gdal_calc.py -A data/tmp/step_b1.tif --A_band=1 -B data/overlays/forest_effective_mask.tif --outfile=data/tmp/final_b1.tif --calc="(1 - B*$(shell python3 scripts/qml_color.py "$(FOREST_QML)" | awk '{print $$4}'))*A + B*$(shell python3 scripts/qml_color.py "$(FOREST_QML)" | awk '{print $$1}')" --type=Byte --overwrite
-	# band 2
-	gdal_calc.py -A data/shaded-basemap.tif --A_band=2 -B data/overlays/water_mask.tif --outfile=data/tmp/step_b2.tif --calc="(1-B)*A + B*$(shell python3 scripts/qml_color.py "$(WATER_QML)" | awk '{print $$2}')" --type=Byte --overwrite
-	gdal_calc.py -A data/tmp/step_b2.tif --A_band=1 -B data/overlays/forest_effective_mask.tif --outfile=data/tmp/final_b2.tif --calc="(1 - B*$(shell python3 scripts/qml_color.py "$(FOREST_QML)" | awk '{print $$4}'))*A + B*$(shell python3 scripts/qml_color.py "$(FOREST_QML)" | awk '{print $$2}')" --type=Byte --overwrite
-	# band 3
-	gdal_calc.py -A data/shaded-basemap.tif --A_band=3 -B data/overlays/water_mask.tif --outfile=data/tmp/step_b3.tif --calc="(1-B)*A + B*$(shell python3 scripts/qml_color.py "$(WATER_QML)" | awk '{print $$3}')" --type=Byte --overwrite
-	gdal_calc.py -A data/tmp/step_b3.tif --A_band=1 -B data/overlays/forest_effective_mask.tif --outfile=data/tmp/final_b3.tif --calc="(1 - B*$(shell python3 scripts/qml_color.py "$(FOREST_QML)" | awk '{print $$4}'))*A + B*$(shell python3 scripts/qml_color.py "$(FOREST_QML)" | awk '{print $$3}')" --type=Byte --overwrite
-
-	gdal_merge.py -separate -o $@ data/tmp/final_b1.tif data/tmp/final_b2.tif data/tmp/final_b3.tif
-	gdal_translate -co COMPRESS=LZW -co TILED=YES $@ $@.tmp && mv $@.tmp $@
+	python3 scripts/blend_overlay.py $< data/overlays/water_mask.tif data/overlays/forest_effective_mask.tif $(WATER_QML) $(FOREST_QML) $@
 
 # Reproject the overlayed shaded basemap for tiling
 data/shaded-basemap-overlays-3857.tif: data/shaded-basemap-overlays.tif
@@ -254,9 +231,9 @@ data/tiles/sample: data/shaded-basemap-sample-overlays.tif
 
 # Sample overlay targets (aligned to sample shaded basemap)
 
-data/overlays/forest_mask-sample.tif: $(FOREST_GEOJSON) data/shaded-basemap-sample-1400.tif
+data/overlays/forest_mask-sample.tif: $(FOREST_GEOJSON) data/shaded-basemap-sample.tif
 	@echo "Rasterizing forest overlay (sample) to $@ aligned with shaded sample basemap"
-	@info=$$(gdalinfo -json data/shaded-basemap-sample-1400.tif); \
+	@info=$$(gdalinfo -json data/shaded-basemap-sample.tif); \
 	 xmin=$$(echo "$$info" | jq -r '.cornerCoordinates.upperLeft[0]'); \
 	 ymax=$$(echo "$$info" | jq -r '.cornerCoordinates.upperLeft[1]'); \
 	 xmax=$$(echo "$$info" | jq -r '.cornerCoordinates.lowerRight[0]'); \
@@ -267,9 +244,9 @@ data/overlays/forest_mask-sample.tif: $(FOREST_GEOJSON) data/shaded-basemap-samp
 	gdal_rasterize -burn 1 -ot Byte -co COMPRESS=LZW -te $$xmin $$ymin $$xmax $$ymax -ts $$xs $$ys -a_nodata 0 "$(FOREST_GEOJSON)" $@
 
 
-data/overlays/water_mask-sample.tif: $(WATER_GEOJSON) data/shaded-basemap-sample-1400.tif
+data/overlays/water_mask-sample.tif: $(WATER_GEOJSON) data/shaded-basemap-sample.tif
 	@echo "Rasterizing water overlay (sample) to $@ aligned with shaded sample basemap"
-	@info=$$(gdalinfo -json data/shaded-basemap-sample-1400.tif); \
+	@info=$$(gdalinfo -json data/shaded-basemap-sample.tif); \
 	 xmin=$$(echo "$$info" | jq -r '.cornerCoordinates.upperLeft[0]'); \
 	 ymax=$$(echo "$$info" | jq -r '.cornerCoordinates.upperLeft[1]'); \
 	 xmax=$$(echo "$$info" | jq -r '.cornerCoordinates.lowerRight[0]'); \
@@ -283,22 +260,8 @@ data/overlays/forest_effective_mask-sample.tif: data/overlays/forest_mask-sample
 	@gdal_calc.py -A data/overlays/forest_mask-sample.tif -B data/overlays/water_mask-sample.tif --outfile=$@ --calc="A*(1-B)" --type=Byte --overwrite
 
 
-data/shaded-basemap-sample-overlays.tif: data/shaded-basemap-sample-1400.tif data/overlays/forest_effective_mask-sample.tif data/overlays/water_mask-sample.tif $(FOREST_QML) $(WATER_QML)
-	@echo "Extracting colors from QMLs (sample)"
-	@read r_fg g_fg a_fg < <(python3 scripts/qml_color.py "$(FOREST_QML)"); \
-	read r_w g_w a_w < <(python3 scripts/qml_color.py "$(WATER_QML)"); \
-	@echo Forest: $$r_fg $$g_fg $$a_fg; echo Water: $$r_w $$g_w $$a_w; \
-	mkdir -p $(dir $@) data/tmp; \
-	# Paint water then forest onto the sample shaded basemap using masks and QML colours
-	gdal_calc.py -A data/shaded-basemap-sample-1400.tif --A_band=1 -B data/overlays/water_mask-sample.tif --outfile=data/tmp/step_b1.tif --calc="(1-B)*A + B*$(shell python3 scripts/qml_color.py "$(WATER_QML)" | awk '{print $$1}')" --type=Byte --overwrite
-	gdal_calc.py -A data/tmp/step_b1.tif --A_band=1 -B data/overlays/forest_effective_mask-sample.tif --outfile=data/tmp/final_b1.tif --calc="(1 - B*$(shell python3 scripts/qml_color.py "$(FOREST_QML)" | awk '{print $$4}'))*A + B*$(shell python3 scripts/qml_color.py "$(FOREST_QML)" | awk '{print $$1}')" --type=Byte --overwrite
-	gdal_calc.py -A data/shaded-basemap-sample-1400.tif --A_band=2 -B data/overlays/water_mask-sample.tif --outfile=data/tmp/step_b2.tif --calc="(1-B)*A + B*$(shell python3 scripts/qml_color.py "$(WATER_QML)" | awk '{print $$2}')" --type=Byte --overwrite
-	gdal_calc.py -A data/tmp/step_b2.tif --A_band=1 -B data/overlays/forest_effective_mask-sample.tif --outfile=data/tmp/final_b2.tif --calc="(1 - B*$(shell python3 scripts/qml_color.py "$(FOREST_QML)" | awk '{print $$4}'))*A + B*$(shell python3 scripts/qml_color.py "$(FOREST_QML)" | awk '{print $$2}')" --type=Byte --overwrite
-	gdal_calc.py -A data/shaded-basemap-sample-1400.tif --A_band=3 -B data/overlays/water_mask-sample.tif --outfile=data/tmp/step_b3.tif --calc="(1-B)*A + B*$(shell python3 scripts/qml_color.py "$(WATER_QML)" | awk '{print $$3}')" --type=Byte --overwrite
-	gdal_calc.py -A data/tmp/step_b3.tif --A_band=1 -B data/overlays/forest_effective_mask-sample.tif --outfile=data/tmp/final_b3.tif --calc="(1 - B*$(shell python3 scripts/qml_color.py "$(FOREST_QML)" | awk '{print $$4}'))*A + B*$(shell python3 scripts/qml_color.py "$(FOREST_QML)" | awk '{print $$3}')" --type=Byte --overwrite
-
-	gdal_merge.py -separate -o $@ data/tmp/final_b1.tif data/tmp/final_b2.tif data/tmp/final_b3.tif
-	gdal_translate -co COMPRESS=LZW -co TILED=YES $@ $@.tmp && mv $@.tmp $@
+data/shaded-basemap-sample-overlays.tif: data/shaded-basemap-sample.tif data/overlays/forest_effective_mask-sample.tif data/overlays/water_mask-sample.tif $(FOREST_QML) $(WATER_QML)
+	python3 scripts/blend_overlay.py $< data/overlays/water_mask-sample.tif data/overlays/forest_effective_mask-sample.tif $(WATER_QML) $(FOREST_QML) $@
 
 
 # Remove generated products (safe clean)
@@ -325,3 +288,66 @@ export-styles:
 
 export-styles-force:
 	python3 scripts/export_styles.py --force $(PROJECT) styling
+
+# ============================================================================
+# Point data (hills and trig points) tile generation
+# ============================================================================
+
+# Convert CSV files to GeoJSON
+$(TRIG_POINTS_GEOJSON): $(TRIG_POINTS_CSV)
+	mkdir -p $(dir $@)
+	python3 scripts/csv_to_geojson.py $< $@ --lat-col lat --lon-col long --name-col tp_name
+
+$(HILLS_GEOJSON): $(HILLS_CSV)
+	mkdir -p $(dir $@)
+	python3 scripts/csv_to_geojson.py $< $@ --lat-col Latitude --lon-col Longitude --name-col Name
+
+# Convenience target to generate all GeoJSON files
+geojson: $(TRIG_POINTS_GEOJSON) $(HILLS_GEOJSON)
+
+# Generate MBTiles from GeoJSON for web mapping
+# Note: This requires tippecanoe to be installed
+# For systems without tippecanoe, the GeoJSON can be served directly by web mapping libraries
+data/tiles/trig-points.mbtiles: $(TRIG_POINTS_GEOJSON)
+	@if command -v tippecanoe >/dev/null 2>&1; then \
+		mkdir -p $(dir $@); \
+		tippecanoe -o $@ -z 13 -Z 7 -r1 --drop-densest-as-needed \
+			--name="Trig Points" \
+			--layer=trig-points \
+			--minimum-zoom=7 \
+			--maximum-zoom=13 \
+			--no-tile-compression \
+			$(TRIG_POINTS_GEOJSON); \
+	else \
+		echo "WARNING: tippecanoe not found. Skipping vector tile generation."; \
+		echo "To generate vector tiles, install tippecanoe: https://github.com/felt/tippecanoe"; \
+		echo "Alternatively, use the GeoJSON file directly with Leaflet or other web mapping libraries."; \
+	fi
+
+data/tiles/hills.mbtiles: $(HILLS_GEOJSON)
+	@if command -v tippecanoe >/dev/null 2>&1; then \
+		mkdir -p $(dir $@); \
+		tippecanoe -o $@ -z 13 -Z 7 -r1 --drop-densest-as-needed \
+			--name="Database of British and Irish Hills" \
+			--layer=hills \
+			--minimum-zoom=7 \
+			--maximum-zoom=13 \
+			--no-tile-compression \
+			$(HILLS_GEOJSON); \
+	else \
+		echo "WARNING: tippecanoe not found. Skipping vector tile generation."; \
+		echo "To generate vector tiles, install tippecanoe: https://github.com/felt/tippecanoe"; \
+		echo "Alternatively, use the GeoJSON file directly with Leaflet or other web mapping libraries."; \
+	fi
+
+# Convenience target to generate point tiles (or just GeoJSON if tippecanoe unavailable)
+point-tiles: geojson
+	@if command -v tippecanoe >/dev/null 2>&1; then \
+		$(MAKE) data/tiles/trig-points.mbtiles data/tiles/hills.mbtiles; \
+	else \
+		echo "Point data available as GeoJSON in data/points/"; \
+		echo "Install tippecanoe to generate vector tiles."; \
+	fi
+
+# Target to build all three tile sets
+all-tiles: data/tiles point-tiles

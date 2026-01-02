@@ -1,4 +1,36 @@
-*.tif
-*.tiff
-*.hgt
+# Generated data and tiles
 data/
+*.tif
+*.vrt
+*.gpkg
+*.hgt
+*.zip
+
+# Generated GeoJSON files (can be large)
+*.geojson
+
+# MBTiles vector tiles
+*.mbtiles
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
