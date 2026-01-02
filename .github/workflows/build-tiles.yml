@@ -113,7 +113,7 @@ jobs:
         if: steps.determine_tileset.outputs.tileset == 'full'
         run: |
           mkdir -p data/overlays
-          # Full Scotland bbox (approximate)
+          # Full UK bbox (includes Scotland and Northern England)
           python3 scripts/fetch_overpass_geojson.py forest 54.5 -8.0 61.0 -0.5 data/overlays/forest.geojson
         timeout-minutes: 30
       
@@ -121,7 +121,7 @@ jobs:
         if: steps.determine_tileset.outputs.tileset == 'full'
         run: |
           mkdir -p data/overlays
-          # Full Scotland bbox (approximate)
+          # Full UK bbox (includes Scotland and Northern England)
           python3 scripts/fetch_overpass_geojson.py water 54.5 -8.0 61.0 -0.5 data/overlays/water.geojson
         timeout-minutes: 30
       
