@@ -12,7 +12,7 @@ the release tag for release builds (`make TILE_VERSION=v1.2 ...`).
 
 Each layer is a separate set of transparent tiles (apart from the topology, which is opaque),
 so a map can switch them on and off. A good stacking order, bottom to top, is topology (or the Imhof style), forests, mist, roads,
-paths, rivers, loch names, railways, shelters, facilities, crags, hills, trig points. The zoom a feature
+paths, rivers, loch names, railways, shelters, facilities, crags, geology, hills, trig points. The zoom a feature
 first appears at is described under each layer's section further down.
 
 | Layer | Sample |
@@ -31,6 +31,7 @@ first appears at is described under each layer's section further down.
 | **Loch names** (`waternames`)<br><br>The name of each loch and reservoir, curved along its main axis. Unlike the other layers this is vector data (GeoJSON) drawn in the browser by `preview/water-names.js`, so the text is sharp and uses the page's fonts. Data: OpenStreetMap. | <img src="docs/samples/waternames.png" width="420" alt="Loch names"> |
 | **Bothies and shelters** (`shelters`)<br><br>Bothies as solid blue discs, visible at every zoom, and shelters as smaller hollow discs from zoom 12, with names. Data: OpenStreetMap. | <img src="docs/samples/shelters.png" width="420" alt="Bothies and shelters"> |
 | **Crags and scree** (`crags`)<br><br>Cliffs as a dark line with ticks on the drop side, scree as stippling and bare rock as hatching, in dark brown ink so the rock reads on any slope. Data: OpenStreetMap. | <img src="docs/samples/crags.png" width="420" alt="Crags and scree"> |
+| **Bedrock geology** (`geology`)<br><br>The British Geological Survey 1:50,000 bedrock map, muted and mostly transparent so it tints the terrain rather than hiding it. Blend it with `mix-blend-mode: multiply`, like the forests. Zoom 9–13. Data: BGS. | <img src="docs/samples/geology.png" width="420" alt="Bedrock geology"> |
 | **Trailheads and facilities** (`facilities`)<br><br>Car parks, campsites, hostels, visitor centres, viewpoints, mountain rescue posts, toilets and ferry terminals as small coloured symbols, plus ferry routes. Data: OpenStreetMap. | <img src="docs/samples/facilities.png" width="420" alt="Trailheads and facilities"> |
 
 The samples were made with `make samples` (the loch names sample is a screenshot of
@@ -209,6 +210,26 @@ Ferry routes (`route=ferry`) are dashed dark blue lines, labelled along the line
 The extraction uses `scripts/osmconf.ini`, which has the extra OSM tags as columns.
 
 Bus stops are not included yet.
+
+## Bedrock geology
+
+The `geology` tile set (`make data/geology.tif`, styled by `styling/Geology.qml`) shows the bedrock
+from the BGS 1:50,000 map. The project's own `GBR BGS 1:50k Bedrock` layer reads the BGS web map
+service live, but that service draws nothing when zoomed out further than about 1:94,000, which is
+every zoom below 12, so it cannot make tiles directly. `scripts/fetch_geology.py` instead asks for
+the area in 100 km blocks at the finest scale the service will draw (about 26 m per pixel), joins
+them and writes one British National Grid GeoTIFF at 53 m per pixel (RGBA, with overviews). QGIS
+then draws that at every zoom. The fetch takes about ten minutes for Scotland and the file is cached
+by the workflow, since the geology hardly changes. Delete `data/geology.tif` to fetch it again.
+
+The BGS colours are bright, because they are designed to tell units apart, so the style removes
+70% of their saturation, darkens them a little and draws them at 45% opacity. Both are set in `styling/Geology.qml`.
+The tiles are transparent, so the map should blend them with multiply; then the hillshade and
+contours stay visible through the colours. There is no legend yet, as the BGS colours stand for
+hundreds of units; the BGS web map service can supply one for a place.
+
+Contains British Geological Survey materials © UKRI. Check the BGS licence terms before publishing
+the tiles, and credit the BGS on the map (the preview page's attribution line does).
 
 ## Crags and scree
 

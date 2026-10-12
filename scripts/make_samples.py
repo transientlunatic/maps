@@ -21,7 +21,7 @@ from PIL import Image
 WIDTH, HEIGHT = 640, 400
 
 # Layers that the map blends with multiply (CSS mix-blend-mode), so the terrain shows through
-MULTIPLY = {"forests"}
+MULTIPLY = {"forests", "geology"}
 
 # name: (centre lon, centre lat, zoom, layers from the bottom up)
 SAMPLES = {
@@ -29,6 +29,7 @@ SAMPLES = {
     "imhof": (-4.80, 56.60, 10, ["imhof"]),
     "elevmist": (-4.80, 56.55, 10, ["topology", "elevmist"]),
     "forests": (-4.42, 56.35, 12, ["topology", "forests"]),
+    "geology": (-4.90, 56.70, 10, ["topology", "geology"]),
     "mist": (-4.80, 56.55, 10, ["topology", "mist"]),
     "dbobih": (-4.63, 56.19, 12, ["topology", "forests", "dbobih"]),
     "trigs": (-4.32, 56.25, 12, ["topology", "forests", "trigs"]),
@@ -45,6 +46,7 @@ SAMPLES = {
 NEEDS = {
     "topology": ["data/merged-dem.tif", "data/hill-shade-merged.tif", "data/contours-merged.gpkg", "data/sea.gpkg"],
     "forests": [],
+    "geology": ["data/geology.tif"],
     "imhof": ["data/imhof-shade-3x.tif", "data/sea.gpkg"],
     "elevmist": ["data/merged-dem.tif"],
     "mist": ["data/mist.tif"],
