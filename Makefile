@@ -10,6 +10,7 @@
 #   data/tiles/trigs/<version>/{z}/{x}/{y}.png      trig points
 #   data/tiles/transport/<version>/{z}/{x}/{y}.png  railways and stations
 #   data/tiles/roads/<version>/{z}/{x}/{y}.png      roads (a quiet layer)
+#   data/tiles/shelters/<version>/{z}/{x}/{y}.png   bothies and shelters
 #   data/tiles/waternames/<version>/water-names.geojson
 #                                            names of lochs, as lines to label (vector)
 #
@@ -43,7 +44,7 @@ SAMPLE_ZMAX ?= 12
 TILE_VERSION ?= dev
 TILE_DIR     ?= data/tiles
 # Raster tile sets rendered by QGIS; the water names are vector data (below)
-TILESETS     := topology dbobih trigs transport roads
+TILESETS     := topology dbobih trigs transport roads shelters
 
 PROJECT ?= projects/basemap.qgz
 
@@ -135,6 +136,20 @@ data/roads.gpkg: data/scotland.osm.pbf
 	rm -f $@
 	ogr2ogr -f GPKG $@ $< lines -nln roads -select name,highway -where "highway IN ($(ROAD_TYPES))"
 
+# Bothies (tourism=wilderness_hut, bothy=yes) and shelters (amenity=shelter, leaving
+# out bus shelters and picnic shelters), as points: mapped buildings are reduced to
+# a point inside them. Uses scripts/osmconf.ini so the tags are real columns.
+SHELTER_KIND := CASE WHEN tourism = 'wilderness_hut' OR bothy = 'yes' THEN 'bothy' ELSE 'shelter' END
+SHELTER_WHERE := tourism = 'wilderness_hut' OR bothy = 'yes' OR (amenity = 'shelter' AND \
+	(shelter_type IN ('basic_hut','lean_to','weather_shelter','rock_shelter') OR \
+	(shelter_type IS NULL AND public_transport IS NULL AND bus IS NULL)))
+OGR_OSM := ogr2ogr -f GPKG --config OSM_CONFIG_FILE scripts/osmconf.ini -dialect SQLITE -nln shelters
+
+data/shelters.gpkg: data/scotland.osm.pbf scripts/osmconf.ini
+	rm -f $@
+	$(OGR_OSM) $@ $< -sql "SELECT geometry, name, $(SHELTER_KIND) AS kind, shelter_type FROM points WHERE $(SHELTER_WHERE)"
+	$(OGR_OSM) -update -append $@ $< -sql "SELECT ST_PointOnSurface(geometry) AS geometry, name, $(SHELTER_KIND) AS kind, shelter_type FROM multipolygons WHERE $(SHELTER_WHERE)"
+
 # One label line per water body, along its main axis.
 data/water-names.gpkg: data/water-polygons.gpkg scripts/water_centerlines.py
 	$(QGIS_PYTHON) scripts/water_centerlines.py $< $@
@@ -174,9 +189,12 @@ transport: data/transport.gpkg
 roads: data/roads.gpkg
 	$(RENDER) --tileset roads --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
 
+shelters: data/shelters.gpkg
+	$(RENDER) --tileset shelters --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
+
 tiles: $(TILESETS) waternames
 
-sample: $(DATA_FILES) $(WATERNAMES_JSON) data/transport.gpkg data/roads.gpkg
+sample: $(DATA_FILES) $(WATERNAMES_JSON) data/transport.gpkg data/roads.gpkg data/shelters.gpkg
 	for t in $(TILESETS); do \
 		$(RENDER) --tileset $$t --extent=$(SAMPLE_BBOX) --zmin $(SAMPLE_ZMIN) --zmax $(SAMPLE_ZMAX) || exit 1; \
 	done
@@ -188,7 +206,7 @@ sample: $(DATA_FILES) $(WATERNAMES_JSON) data/transport.gpkg data/roads.gpkg
 clean:
 	rm -rf data/tiles data/merged-dem.tif data/hill-shade-merged.tif \
 		data/contours-merged.gpkg data/merged.vrt data/water-polygons.gpkg \
-		data/water-names.gpkg data/transport.gpkg data/roads.gpkg
+		data/water-names.gpkg data/transport.gpkg data/roads.gpkg data/shelters.gpkg
 
 # Also removes the downloaded DEM zips and unpacked HGT files.
 distclean: clean

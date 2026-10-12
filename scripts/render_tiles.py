@@ -70,6 +70,17 @@ TILESETS = {
         },
         "transparent": True,
     },
+    # Bothies and shelters (`make data/shelters.gpkg`), styled with styling/Shelters.qml.
+    "shelters": {
+        "layers": ["Shelters"],
+        "extra_layers": {
+            "Shelters": {
+                "source": "data/shelters.gpkg|layername=shelters",
+                "style": "styling/Shelters.qml",
+            },
+        },
+        "transparent": True,
+    },
 }
 
 

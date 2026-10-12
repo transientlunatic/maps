@@ -19,6 +19,7 @@ Three tile sets are produced, matching the layers in the site's Leaflet map:
 | `trigs`    | Ordnance Survey trig points (transparent)                             | `data/tiles/trigs/<version>/{z}/{x}/{y}.png`    |
 | `transport` | Railways (one solid dark grey line) and stations (dark circles with names) (transparent) | `data/tiles/transport/<version>/{z}/{x}/{y}.png` |
 | `roads` | Main roads as thin grey lines, quieter than the railways (transparent) | `data/tiles/roads/<version>/{z}/{x}/{y}.png` |
+| `shelters` | Bothies (blue discs) and shelters (hollow discs) with names (transparent) | `data/tiles/shelters/<version>/{z}/{x}/{y}.png` |
 | `waternames` | Names of lochs and reservoirs: label lines as GeoJSON (vector), drawn in the browser | `data/tiles/waternames/<version>/water-names.geojson` |
 
 ## Data sources
@@ -127,9 +128,28 @@ them with `styling/Rail Lines.qml` and `styling/Rail Stations.qml`.
 The `roads` tile set is a deliberately quiet companion to the railways: thin mid-grey lines with
 no casing or labels, drawn from `data/roads.gpkg` (`make data/roads.gpkg`) with
 `styling/Roads.qml`. Only main roads are included (motorway down to residential), not tracks,
-paths or service roads. Bigger roads are slightly darker and heavier and draw on top; tertiary
-and unclassified roads appear from zoom 11 and residential streets from zoom 13. Add it
+paths or service roads. Bigger roads are slightly darker and heavier and draw on top. Add it
 beneath the `transport` layer so the railways stay on top.
+
+Zoomed out (zoom 9 and 10) only motorways, trunk roads and primary roads are shown. Secondary
+roads join at zoom 11, tertiary and unclassified roads at zoom 12 and residential streets at
+zoom 13.
+
+## Bothies and shelters
+
+The `shelters` tile set (`make data/shelters.gpkg`, styled by `styling/Shelters.qml`) marks
+bothies and shelters from OSM:
+
+- **Bothies**: `tourism=wilderness_hut` or `bothy=yes`. Solid blue discs (the blue the QGIS
+  project already uses for bothies) with a white edge, shown at every zoom, with names from
+  zoom 11.
+- **Shelters**: `amenity=shelter`, leaving out bus stop and picnic shelters (those with
+  `shelter_type=public_transport` or `picnic_shelter`, or tagged `bus`/`public_transport`).
+  Smaller hollow discs from zoom 12, with italic names from zoom 13.
+
+Mapped buildings are reduced to a point inside them. The extraction uses
+`scripts/osmconf.ini`, GDAL's default OSM configuration with the bothy and shelter tags
+added as columns.
 
 ## Editing the styling
 
