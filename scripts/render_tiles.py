@@ -26,7 +26,6 @@ TILESETS = {
         "layers": [
             "Contours",
             "OSM - Water",
-            "OSM - Forestry",
             "merged-hillshade-315",
             "merged-dem",
         ],
@@ -34,6 +33,12 @@ TILESETS = {
         # The DEM ramp has extra levels below 200 m (see scripts/lowland_ramp.py).
         "styles": {"merged-dem": "styling/merged-dem.qml"},
         "transparent": False,
+    },
+    # Forest, drawn from the project's "OSM - Forestry" layer as a transparent overlay so
+    # that it can be switched off. Put it above the topology.
+    "forests": {
+        "layers": ["OSM - Forestry"],
+        "transparent": True,
     },
     "dbobih": {
         "layers": ["Database of British and Irish Hills"],

@@ -8,6 +8,9 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,400;1,400&display=swap">
 <style>
   html, body, #map { height: 100%; margin: 0; }
+  /* Forest is a transparent overlay; multiplying it with the topology keeps the hillshade
+     and contours showing through the trees. */
+  .forest-layer { mix-blend-mode: multiply; }
 </style>
 </head>
 <body>
@@ -27,6 +30,7 @@
   const q = new URLSearchParams(location.search);
   const map = L.map('map').setView([+(q.get('lat') || 56.2), +(q.get('lng') || -4.5)], +(q.get('z') || 11));
   const topology = L.tileLayer(`${tiles}/topology/${version}/{z}/{x}/{y}.png`, options).addTo(map);
+  const forests = L.tileLayer(`${tiles}/forests/${version}/{z}/{x}/{y}.png`, { ...options, className: 'forest-layer' }).addTo(map);
   const hills = L.tileLayer(`${tiles}/dbobih/${version}/{z}/{x}/{y}.png`, options).addTo(map);
   const trigs = L.tileLayer(`${tiles}/trigs/${version}/{z}/{x}/{y}.png`, options);
   const roads = L.tileLayer(`${tiles}/roads/${version}/{z}/{x}/{y}.png`, options).addTo(map);
@@ -38,7 +42,7 @@
   const water = new WaterNames(`${tiles}/waternames/${version}/water-names.geojson`).addTo(map);
 
   L.control.layers({ Topology: topology }, {
-    'Hills': hills, 'Trig points': trigs, 'Roads': roads, 'Railways and stations': transport, 'Facilities': facilities, 'Rivers and waterfalls': rivers, 'Paths': paths, 'Bothies and shelters': shelters, 'Water names': water,
+    'Forest': forests, 'Hills': hills, 'Trig points': trigs, 'Roads': roads, 'Railways and stations': transport, 'Facilities': facilities, 'Rivers and waterfalls': rivers, 'Paths': paths, 'Bothies and shelters': shelters, 'Water names': water,
   }).addTo(map);
 </script>
 </body>
