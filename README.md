@@ -31,7 +31,7 @@ first appears at is described under each layer's section further down.
 | **Loch names** (`waternames`)<br><br>The name of each loch and reservoir, curved along its main axis. Unlike the other layers this is vector data (GeoJSON) drawn in the browser by `preview/water-names.js`, so the text is sharp and uses the page's fonts. Data: OpenStreetMap. | <img src="docs/samples/waternames.png" width="420" alt="Loch names"> |
 | **Bothies and shelters** (`shelters`)<br><br>Bothies as solid blue discs, visible at every zoom, and shelters as smaller hollow discs from zoom 12, with names. Data: OpenStreetMap. | <img src="docs/samples/shelters.png" width="420" alt="Bothies and shelters"> |
 | **Crags and scree** (`crags`)<br><br>Cliffs as a dark line with ticks on the drop side, scree as stippling and bare rock as hatching, in dark brown ink so the rock reads on any slope. Data: OpenStreetMap. | <img src="docs/samples/crags.png" width="420" alt="Crags and scree"> |
-| **Bedrock geology** (`geology`)<br><br>The British Geological Survey 1:50,000 bedrock map, muted and half transparent so it tints the terrain rather than hiding it. Blend it with `mix-blend-mode: multiply`, like the forests. Zoom 9–13. Data: BGS. | <img src="docs/samples/geology.png" width="420" alt="Bedrock geology"> |
+| **Bedrock geology** (`geology`)<br><br>The British Geological Survey 1:50,000 bedrock map, muted and mostly transparent so it tints the terrain rather than hiding it. Blend it with `mix-blend-mode: multiply`, like the forests. Zoom 9–13. Data: BGS. | <img src="docs/samples/geology.png" width="420" alt="Bedrock geology"> |
 | **Trailheads and facilities** (`facilities`)<br><br>Car parks, campsites, hostels, visitor centres, viewpoints, mountain rescue posts, toilets and ferry terminals as small coloured symbols, plus ferry routes. Data: OpenStreetMap. | <img src="docs/samples/facilities.png" width="420" alt="Trailheads and facilities"> |
 
 The samples were made with `make samples` (the loch names sample is a screenshot of
@@ -223,7 +223,7 @@ then draws that at every zoom. The fetch takes about ten minutes for Scotland an
 by the workflow, since the geology hardly changes. Delete `data/geology.tif` to fetch it again.
 
 The BGS colours are bright, because they are designed to tell units apart, so the style removes
-over half of their saturation and draws them at 50% opacity. Both are set in `styling/Geology.qml`.
+70% of their saturation, darkens them a little and draws them at 45% opacity. Both are set in `styling/Geology.qml`.
 The tiles are transparent, so the map should blend them with multiply; then the hillshade and
 contours stay visible through the colours. There is no legend yet, as the BGS colours stand for
 hundreds of units; the BGS web map service can supply one for a place.

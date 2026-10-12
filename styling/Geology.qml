@@ -120,7 +120,7 @@
     <provider>
       <resampling enabled="false" zoomedOutResamplingMethod="nearestNeighbour" zoomedInResamplingMethod="nearestNeighbour" maxOversampling="2"/>
     </provider>
-    <rasterrenderer nodataColor="" greenBand="2" opacity="0.5" redBand="1" blueBand="3" alphaBand="4" type="multibandcolor">
+    <rasterrenderer nodataColor="" greenBand="2" opacity="0.45" redBand="1" blueBand="3" alphaBand="4" type="multibandcolor">
       <rasterTransparency/>
       <minMaxOrigin>
         <limits>MinMax</limits>
@@ -146,8 +146,8 @@
         <algorithm>NoEnhancement</algorithm>
       </blueContrastEnhancement>
     </rasterrenderer>
-    <brightnesscontrast brightness="0" contrast="0" gamma="1"/>
-    <huesaturation colorizeGreen="128" colorizeBlue="128" invertColors="0" saturation="-55" grayscaleMode="0" colorizeOn="0" colorizeRed="255" colorizeStrength="100"/>
+    <brightnesscontrast brightness="-20" contrast="0" gamma="1"/>
+    <huesaturation colorizeGreen="128" colorizeBlue="128" invertColors="0" saturation="-70" grayscaleMode="0" colorizeOn="0" colorizeRed="255" colorizeStrength="100"/>
     <rasterresampler zoomedInResampler="cubic" zoomedOutResampler="bilinear" maxOversampling="2"/>
     <resamplingStage>resamplingFilter</resamplingStage>
   </pipe>
