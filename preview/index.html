@@ -23,14 +23,22 @@
   const tiles = `../data/tiles`;
   const options = { minZoom: 9, maxZoom: 13 };
 
-  const map = L.map('map').setView([56.2, -4.5], 11);
+  // Optional ?lat=&lng=&z= start the map somewhere else
+  const q = new URLSearchParams(location.search);
+  const map = L.map('map').setView([+(q.get('lat') || 56.2), +(q.get('lng') || -4.5)], +(q.get('z') || 11));
   const topology = L.tileLayer(`${tiles}/topology/${version}/{z}/{x}/{y}.png`, options).addTo(map);
   const hills = L.tileLayer(`${tiles}/dbobih/${version}/{z}/{x}/{y}.png`, options).addTo(map);
   const trigs = L.tileLayer(`${tiles}/trigs/${version}/{z}/{x}/{y}.png`, options);
+  const roads = L.tileLayer(`${tiles}/roads/${version}/{z}/{x}/{y}.png`, options).addTo(map);
+  const facilities = L.tileLayer(`${tiles}/facilities/${version}/{z}/{x}/{y}.png`, options).addTo(map);
+  const rivers = L.tileLayer(`${tiles}/rivers/${version}/{z}/{x}/{y}.png`, options).addTo(map);
+  const paths = L.tileLayer(`${tiles}/paths/${version}/{z}/{x}/{y}.png`, options).addTo(map);
+  const shelters = L.tileLayer(`${tiles}/shelters/${version}/{z}/{x}/{y}.png`, options).addTo(map);
+  const transport = L.tileLayer(`${tiles}/transport/${version}/{z}/{x}/{y}.png`, options).addTo(map);
   const water = new WaterNames(`${tiles}/waternames/${version}/water-names.geojson`).addTo(map);
 
   L.control.layers({ Topology: topology }, {
-    'Hills': hills, 'Trig points': trigs, 'Water names': water,
+    'Hills': hills, 'Trig points': trigs, 'Roads': roads, 'Railways and stations': transport, 'Facilities': facilities, 'Rivers and waterfalls': rivers, 'Paths': paths, 'Bothies and shelters': shelters, 'Water names': water,
   }).addTo(map);
 </script>
 </body>

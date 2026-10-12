@@ -30,6 +30,9 @@ TILESETS = {
             "merged-hillshade-315",
             "merged-dem",
         ],
+        # Styles from styling/ that replace the project's own for these layers.
+        # The DEM ramp has extra levels below 200 m (see scripts/lowland_ramp.py).
+        "styles": {"merged-dem": "styling/merged-dem.qml"},
         "transparent": False,
     },
     "dbobih": {
@@ -38,6 +41,90 @@ TILESETS = {
     },
     "trigs": {
         "layers": ["Trig Points"],
+        "transparent": True,
+    },
+    # Railways and stations from OpenStreetMap (`make data/transport.gpkg`).
+    # These layers are not in the QGIS project: they are loaded from data/ and
+    # styled with the QML in styling/, so railways and stations stand out
+    # against the topology. Open both in QGIS to edit the styles.
+    "transport": {
+        "layers": ["Rail Stations", "Rail Lines"],
+        "extra_layers": {
+            "Rail Lines": {
+                "source": "data/transport.gpkg|layername=rail_lines",
+                "style": "styling/Rail Lines.qml",
+            },
+            "Rail Stations": {
+                "source": "data/transport.gpkg|layername=rail_stations",
+                "style": "styling/Rail Stations.qml",
+            },
+        },
+        "transparent": True,
+    },
+    # A quiet road layer (`make data/roads.gpkg`): thin grey lines that stay
+    # behind the railways. Styled with styling/Roads.qml.
+    "roads": {
+        "layers": ["Roads"],
+        "extra_layers": {
+            "Roads": {
+                "source": "data/roads.gpkg|layername=roads",
+                "style": "styling/Roads.qml",
+            },
+        },
+        "transparent": True,
+    },
+    # Bothies and shelters (`make data/shelters.gpkg`), styled with styling/Shelters.qml.
+    "shelters": {
+        "layers": ["Shelters"],
+        "extra_layers": {
+            "Shelters": {
+                "source": "data/shelters.gpkg|layername=shelters",
+                "style": "styling/Shelters.qml",
+            },
+        },
+        "transparent": True,
+    },
+    # Footpaths, tracks and bridleways (`make data/paths.gpkg`), styled with styling/Paths.qml.
+    "paths": {
+        "layers": ["Paths"],
+        "extra_layers": {
+            "Paths": {
+                "source": "data/paths.gpkg|layername=paths",
+                "style": "styling/Paths.qml",
+            },
+        },
+        "transparent": True,
+    },
+    # Named rivers, streams and canals with labels along them, plus waterfalls
+    # (`make data/rivers.gpkg`), styled with styling/Rivers.qml and styling/Waterfalls.qml.
+    "rivers": {
+        "layers": ["Waterfalls", "Rivers"],
+        "extra_layers": {
+            "Rivers": {
+                "source": "data/rivers.gpkg|layername=rivers",
+                "style": "styling/Rivers.qml",
+            },
+            "Waterfalls": {
+                "source": "data/rivers.gpkg|layername=waterfalls",
+                "style": "styling/Waterfalls.qml",
+            },
+        },
+        "transparent": True,
+    },
+    # Trailheads and facilities (`make data/facilities.gpkg`): car parks, campsites, hostels,
+    # toilets, viewpoints, visitor centres, ferry terminals and routes, mountain rescue posts.
+    "facilities": {
+        "layers": ["Facilities", "Ferries"],
+        "extra_layers": {
+            "Facilities": {
+                "source": "data/facilities.gpkg|layername=facilities",
+                "style": "styling/Facilities.qml",
+            },
+            "Ferries": {
+                "source": "data/facilities.gpkg|layername=ferries",
+                "style": "styling/Ferries.qml",
+            },
+        },
         "transparent": True,
     },
 }
@@ -100,6 +187,7 @@ def main():
         QgsProcessingContext,
         QgsProcessingFeedback,
         QgsProject,
+        QgsVectorLayer,
     )
 
     west, south, east, north = (float(v) for v in args.extent.split(","))
@@ -118,6 +206,21 @@ def main():
     project = QgsProject.instance()
     if not project.read(args.project):
         sys.exit(f"Could not read project {args.project}")
+
+    for name, qml in spec.get("styles", {}).items():
+        _, ok = project.mapLayersByName(name)[0].loadNamedStyle(qml)
+        if not ok:
+            sys.exit(f"Could not load style {qml}")
+
+    # Layers that are not part of the project: load them with their QML style.
+    for name, extra in spec.get("extra_layers", {}).items():
+        layer = QgsVectorLayer(extra["source"], name, "ogr")
+        if not layer.isValid():
+            sys.exit(f"Could not open {extra['source']} (run `make data/transport.gpkg`)")
+        _, ok = layer.loadNamedStyle(extra["style"])
+        if not ok:
+            sys.exit(f"Could not load style {extra['style']}")
+        project.addMapLayer(layer)
 
     # Switch off everything, then switch on this tile set's layers.
     root = project.layerTreeRoot()
