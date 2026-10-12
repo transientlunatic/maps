@@ -200,8 +200,8 @@ def main():
                 continue
             f = ogr.Feature(out.GetLayerDefn())
             f.SetField("name", name)
-            f.SetField("area_m2", float(metric.area))
-            f.SetField("length_m", float(line.length))
+            f.SetField("area_m2", round(float(metric.area)))
+            f.SetField("length_m", round(float(line.length)))
             f.SetGeometry(ogr.CreateGeometryFromWkb(
                 shapely.to_wkb(shapely.transform(line, to_wgs84))))
             out.CreateFeature(f)

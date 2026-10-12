@@ -17,7 +17,7 @@ Three tile sets are produced, matching the layers in the site's Leaflet map:
 | `topology` | Hypsometric tints, hillshade, contours, OSM water and forest          | `data/tiles/topology/<version>/{z}/{x}/{y}.png` |
 | `dbobih`   | Hill markers, names and heights (transparent)                         | `data/tiles/dbobih/<version>/{z}/{x}/{y}.png`   |
 | `trigs`    | Ordnance Survey trig points (transparent)                             | `data/tiles/trigs/<version>/{z}/{x}/{y}.png`    |
-| `waternames` | Names of lochs and reservoirs, curved along each loch's main axis (transparent) | `data/tiles/waternames/<version>/{z}/{x}/{y}.png` |
+| `waternames` | Names of lochs and reservoirs: label lines as GeoJSON (vector), drawn in the browser | `data/tiles/waternames/<version>/water-names.geojson` |
 
 ## Data sources
 
@@ -78,13 +78,27 @@ job to stay inside GitHub's per-job limit.
 
 ## Water names
 
-The names of lochs are placed along each loch's main axis. `scripts/water_centerlines.py`
-takes the named OSM water polygons and, for each one, finds the longest path through its
-medial axis, so the line follows a winding loch rather than cutting across it. It then
-smooths the line (written to `data/water-names.gpkg`) so QGIS can curve a label along it.
-The style, with larger and more widely spaced letters for longer lochs, is
-`styling/Water Names.qml`; to tune it, open `data/water-names.gpkg` in QGIS, load the
-style and re-save it.
+The names of lochs are placed along each loch's main axis, and unlike the other layers they
+are vector data: the browser draws the text, so it uses the site's own fonts and stays sharp.
+
+`scripts/water_centerlines.py` takes the named OSM water polygons and, for each one, finds
+the longest path through its medial axis, so the line follows a winding loch rather than
+cutting across it. It smooths the line (written to `data/water-names.gpkg`), and
+`make waternames` converts the lines to a small GeoJSON file (`name`, `length_m`).
+
+`preview/water-names.js` is a Leaflet layer that draws them with
+[Leaflet.TextPath](https://github.com/makinacorpus/Leaflet.TextPath): size and letter
+spacing grow with the loch's length, small lochs only appear at higher zooms, and names
+that do not fit along their loch are dropped. Use it from your own map with:
+
+```js
+import { WaterNames } from './water-names.js';
+new WaterNames('https://tiles.daniel-williams.co.uk/waternames/<version>/water-names.geojson').addTo(map);
+```
+
+`preview/index.html` shows all the layers together: run `python3 -m http.server` in the
+repository root and open <http://localhost:8000/preview/> (add `?v=<version>` to see another
+build).
 
 Lochs that are arms of the sea (Loch Fyne, Loch Linnhe and so on) have no water polygon in
 OSM, so they are not labelled by this layer.

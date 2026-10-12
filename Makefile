@@ -8,7 +8,8 @@
 #   data/tiles/topology/<version>/{z}/{x}/{y}.png   terrain, contours, water, forest
 #   data/tiles/dbobih/<version>/{z}/{x}/{y}.png     hill markers and names
 #   data/tiles/trigs/<version>/{z}/{x}/{y}.png      trig points
-#   data/tiles/waternames/<version>/{z}/{x}/{y}.png names of lochs, along their axes
+#   data/tiles/waternames/<version>/water-names.geojson
+#                                            names of lochs, as lines to label (vector)
 #
 # Quick start:   make sample     (one small area, a few zoom levels)
 #                make tiles      (all of Scotland, zooms 9-13; slow)
@@ -39,7 +40,8 @@ SAMPLE_ZMAX ?= 12
 # Version directory in the tile URLs; releases set this to the release tag
 TILE_VERSION ?= dev
 TILE_DIR     ?= data/tiles
-TILESETS     := topology dbobih trigs waternames
+# Raster tile sets rendered by QGIS; the water names are vector data (below)
+TILESETS     := topology dbobih trigs
 
 PROJECT ?= projects/basemap.qgz
 
@@ -59,7 +61,7 @@ HILLSHADE_Z     ?= 4
 RENDER = QT_QPA_PLATFORM=offscreen $(QGIS_PYTHON) scripts/render_tiles.py \
 	--project $(PROJECT) --out $(TILE_DIR) --version $(TILE_VERSION)
 
-.PHONY: all dem tiles sample $(TILESETS) clean distclean \
+.PHONY: all dem tiles sample waternames $(TILESETS) clean distclean \
 	apply-styles export-styles export-styles-force
 
 all: tiles
@@ -115,6 +117,18 @@ data/water-polygons.gpkg: data/scotland.osm.pbf
 data/water-names.gpkg: data/water-polygons.gpkg scripts/water_centerlines.py
 	$(QGIS_PYTHON) scripts/water_centerlines.py $< $@
 
+# Label lines as GeoJSON for the browser, which draws the names (see
+# preview/water-names.js). Simplified to about 5 m and rounded to 5 decimals.
+WATERNAMES_JSON := $(TILE_DIR)/waternames/$(TILE_VERSION)/water-names.geojson
+
+$(WATERNAMES_JSON): data/water-names.gpkg
+	mkdir -p $(dir $@)
+	rm -f $@
+	ogr2ogr -f GeoJSON $@ $< water_names -select name,length_m -simplify 0.00005 \
+		-lco COORDINATE_PRECISION=5 -lco RFC7946=YES
+
+waternames: $(WATERNAMES_JSON)
+
 dem: data/merged-dem.tif data/hill-shade-merged.tif data/contours-merged.gpkg
 
 # ---------------------------------------------------------------------------
@@ -132,12 +146,9 @@ dbobih: sources/dobih.csv
 trigs: sources/trigs.csv
 	$(RENDER) --tileset trigs --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
 
-waternames: data/water-names.gpkg
-	$(RENDER) --tileset waternames --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
+tiles: $(TILESETS) waternames
 
-tiles: $(TILESETS)
-
-sample: $(DATA_FILES) data/water-names.gpkg
+sample: $(DATA_FILES) $(WATERNAMES_JSON)
 	for t in $(TILESETS); do \
 		$(RENDER) --tileset $$t --extent=$(SAMPLE_BBOX) --zmin $(SAMPLE_ZMIN) --zmax $(SAMPLE_ZMAX) || exit 1; \
 	done
