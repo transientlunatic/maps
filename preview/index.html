@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tile preview</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,400;1,400&display=swap">
+<style>
+  html, body, #map { height: 100%; margin: 0; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-textpath@1.2.3/leaflet.textpath.js"></script>
+<script type="module">
+  import { WaterNames } from './water-names.js';
+
+  // Serve the repository root (`python3 -m http.server`) and open /preview/.
+  // Use ?v=<version> to look at a different build; the default is `dev`.
+  const version = new URLSearchParams(location.search).get('v') || 'dev';
+  const tiles = `../data/tiles`;
+  const options = { minZoom: 9, maxZoom: 13 };
+
+  const map = L.map('map').setView([56.2, -4.5], 11);
+  const topology = L.tileLayer(`${tiles}/topology/${version}/{z}/{x}/{y}.png`, options).addTo(map);
+  const hills = L.tileLayer(`${tiles}/dbobih/${version}/{z}/{x}/{y}.png`, options).addTo(map);
+  const trigs = L.tileLayer(`${tiles}/trigs/${version}/{z}/{x}/{y}.png`, options);
+  const water = new WaterNames(`${tiles}/waternames/${version}/water-names.geojson`).addTo(map);
+
+  L.control.layers({ Topology: topology }, {
+    'Hills': hills, 'Trig points': trigs, 'Water names': water,
+  }).addTo(map);
+</script>
+</body>
+</html>
