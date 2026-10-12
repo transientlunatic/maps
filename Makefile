@@ -11,6 +11,7 @@
 #   data/tiles/transport/<version>/{z}/{x}/{y}.png  railways and stations
 #   data/tiles/roads/<version>/{z}/{x}/{y}.png      roads (a quiet layer)
 #   data/tiles/shelters/<version>/{z}/{x}/{y}.png   bothies and shelters
+#   data/tiles/paths/<version>/{z}/{x}/{y}.png      footpaths and tracks
 #   data/tiles/waternames/<version>/water-names.geojson
 #                                            names of lochs, as lines to label (vector)
 #
@@ -44,7 +45,7 @@ SAMPLE_ZMAX ?= 12
 TILE_VERSION ?= dev
 TILE_DIR     ?= data/tiles
 # Raster tile sets rendered by QGIS; the water names are vector data (below)
-TILESETS     := topology dbobih trigs transport roads shelters
+TILESETS     := topology dbobih trigs transport roads shelters paths
 
 PROJECT ?= projects/basemap.qgz
 
@@ -136,6 +137,18 @@ data/roads.gpkg: data/scotland.osm.pbf
 	rm -f $@
 	ogr2ogr -f GPKG $@ $< lines -nln roads -select name,highway -where "highway IN ($(ROAD_TYPES))"
 
+# Footpaths, tracks and bridleways, for walkers. Pavements and crossings (footway=sidewalk,
+# crossing), ways closed to walkers (foot=no) and private ways are left out.
+data/paths.gpkg: data/scotland.osm.pbf
+	rm -f $@
+	ogr2ogr -f GPKG $@ $< -dialect SQLITE -nln paths -sql "SELECT geometry, name, highway, \
+		hstore_get_value(other_tags, 'tracktype') AS tracktype, hstore_get_value(other_tags, 'sac_scale') AS sac_scale, \
+		hstore_get_value(other_tags, 'trail_visibility') AS trail_visibility FROM lines \
+		WHERE highway IN ('path','track','bridleway','footway') \
+		AND COALESCE(hstore_get_value(other_tags, 'footway'), '') NOT IN ('sidewalk','crossing','traffic_island') \
+		AND COALESCE(hstore_get_value(other_tags, 'foot'), '') <> 'no' \
+		AND COALESCE(hstore_get_value(other_tags, 'access'), '') NOT IN ('private','no')"
+
 # Bothies (tourism=wilderness_hut, bothy=yes) and shelters (amenity=shelter, leaving
 # out bus shelters and picnic shelters), as points: mapped buildings are reduced to
 # a point inside them. Uses scripts/osmconf.ini so the tags are real columns.
@@ -192,9 +205,12 @@ roads: data/roads.gpkg
 shelters: data/shelters.gpkg
 	$(RENDER) --tileset shelters --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
 
+paths: data/paths.gpkg
+	$(RENDER) --tileset paths --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
+
 tiles: $(TILESETS) waternames
 
-sample: $(DATA_FILES) $(WATERNAMES_JSON) data/transport.gpkg data/roads.gpkg data/shelters.gpkg
+sample: $(DATA_FILES) $(WATERNAMES_JSON) data/transport.gpkg data/roads.gpkg data/shelters.gpkg data/paths.gpkg
 	for t in $(TILESETS); do \
 		$(RENDER) --tileset $$t --extent=$(SAMPLE_BBOX) --zmin $(SAMPLE_ZMIN) --zmax $(SAMPLE_ZMAX) || exit 1; \
 	done
@@ -206,7 +222,7 @@ sample: $(DATA_FILES) $(WATERNAMES_JSON) data/transport.gpkg data/roads.gpkg dat
 clean:
 	rm -rf data/tiles data/merged-dem.tif data/hill-shade-merged.tif \
 		data/contours-merged.gpkg data/merged.vrt data/water-polygons.gpkg \
-		data/water-names.gpkg data/transport.gpkg data/roads.gpkg data/shelters.gpkg
+		data/water-names.gpkg data/transport.gpkg data/roads.gpkg data/shelters.gpkg data/paths.gpkg
 
 # Also removes the downloaded DEM zips and unpacked HGT files.
 distclean: clean

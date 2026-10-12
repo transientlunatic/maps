@@ -84,6 +84,17 @@ TILESETS = {
         },
         "transparent": True,
     },
+    # Footpaths, tracks and bridleways (`make data/paths.gpkg`), styled with styling/Paths.qml.
+    "paths": {
+        "layers": ["Paths"],
+        "extra_layers": {
+            "Paths": {
+                "source": "data/paths.gpkg|layername=paths",
+                "style": "styling/Paths.qml",
+            },
+        },
+        "transparent": True,
+    },
 }
 
 

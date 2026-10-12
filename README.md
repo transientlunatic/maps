@@ -19,6 +19,7 @@ Three tile sets are produced, matching the layers in the site's Leaflet map:
 | `trigs`    | Ordnance Survey trig points (transparent)                             | `data/tiles/trigs/<version>/{z}/{x}/{y}.png`    |
 | `transport` | Railways (one solid dark grey line) and stations (dark circles with names) (transparent) | `data/tiles/transport/<version>/{z}/{x}/{y}.png` |
 | `roads` | Main roads as thin grey lines, quieter than the railways (transparent) | `data/tiles/roads/<version>/{z}/{x}/{y}.png` |
+| `paths` | Footpaths, bridleways and tracks for walkers, from zoom 12 (transparent) | `data/tiles/paths/<version>/{z}/{x}/{y}.png` |
 | `shelters` | Bothies (blue discs) and shelters (hollow discs) with names (transparent) | `data/tiles/shelters/<version>/{z}/{x}/{y}.png` |
 | `waternames` | Names of lochs and reservoirs: label lines as GeoJSON (vector), drawn in the browser | `data/tiles/waternames/<version>/water-names.geojson` |
 
@@ -134,6 +135,22 @@ beneath the `transport` layer so the railways stay on top.
 Zoomed out (zoom 9 and 10) only motorways, trunk roads and primary roads are shown. Secondary
 roads join at zoom 11, tertiary and unclassified roads at zoom 12 and residential streets at
 zoom 13.
+
+## Paths
+
+The `paths` tile set (`make data/paths.gpkg`, styled by `styling/Paths.qml`) shows `highway=path`,
+`footway`, `bridleway` and `track` from zoom 12. Pavements and crossings (`footway=sidewalk` or
+`crossing`), ways closed to walkers (`foot=no`) and private ways are left out, and each line has a
+faint white edge so it reads over forest and dark hillshade.
+
+- **Tracks** are solid brown-grey lines; better surfaced ones (`tracktype` grade 1 and 2) are darker
+  and heavier, rougher ones are dashed.
+- **Footpaths and bridleways** are red-brown dashes. Difficulty follows `sac_scale`: `mountain_hiking`
+  is darker and bolder, and demanding or alpine paths are dark red dots. Paths whose
+  `trail_visibility` is bad or worse are faint, widely spaced dots.
+
+Where `sac_scale` or `trail_visibility` are not mapped (common in Scotland) a path is drawn as an
+ordinary footpath. Draw it beneath the railways and above the roads.
 
 ## Bothies and shelters
 
