@@ -159,16 +159,16 @@ ordinary footpath. Draw it beneath the railways and above the roads.
 ## Rivers and waterfalls
 
 The `rivers` tile set (`make data/rivers.gpkg`, styled by `styling/Rivers.qml` and
-`styling/Waterfalls.qml`) draws `waterway=river`, `stream` and `canal` as blue lines, leaving out
-underground culverts and ditches. Rivers show from zoom 9 and streams from zoom 12; canals are a
-greyer blue. Named rivers and canals are labelled along the line in italic Lato from zoom 11, and
+`styling/Waterfalls.qml`) draws `waterway=river`, `stream` and `canal` as lines in the same pale blue as the base map's water (`#aad3df`), leaving out
+underground culverts and ditches. Rivers show from zoom 9 and streams from zoom 12. Named rivers and canals are labelled along the line in italic Lato from zoom 11, and
 named streams (burns) from zoom 13.
 
 Waterfalls (`waterway=waterfall` points) are small blue downward triangles from zoom 12, with
 their names from zoom 13.
 
 The topology tiles already draw some water lines from the ESRI OSM service, so this layer
-overlays slightly stronger blue lines on top of them.
+overlays slightly heavier lines on top of them. Labels and the waterfall markers use a darker
+blue so they stay legible.
 
 ## Bothies and shelters
 
