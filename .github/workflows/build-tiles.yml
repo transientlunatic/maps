@@ -24,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        tileset: [topology, dbobih, trigs, transport, waternames]
+        tileset: [topology, dbobih, trigs, transport, roads, waternames]
 
     env:
       # Full builds only happen on a release, and the release tag becomes the
@@ -62,7 +62,7 @@ jobs:
 
       # The OSM extract changes slowly, so reuse it for a month
       - name: Cache OSM extract
-        if: matrix.tileset == 'waternames' || matrix.tileset == 'transport'
+        if: matrix.tileset == 'waternames' || matrix.tileset == 'transport' || matrix.tileset == 'roads'
         uses: actions/cache@v4
         with:
           path: data/scotland.osm.pbf

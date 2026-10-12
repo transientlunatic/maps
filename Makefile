@@ -9,6 +9,7 @@
 #   data/tiles/dbobih/<version>/{z}/{x}/{y}.png     hill markers and names
 #   data/tiles/trigs/<version>/{z}/{x}/{y}.png      trig points
 #   data/tiles/transport/<version>/{z}/{x}/{y}.png  railways and stations
+#   data/tiles/roads/<version>/{z}/{x}/{y}.png      roads (a quiet layer)
 #   data/tiles/waternames/<version>/water-names.geojson
 #                                            names of lochs, as lines to label (vector)
 #
@@ -42,7 +43,7 @@ SAMPLE_ZMAX ?= 12
 TILE_VERSION ?= dev
 TILE_DIR     ?= data/tiles
 # Raster tile sets rendered by QGIS; the water names are vector data (below)
-TILESETS     := topology dbobih trigs transport
+TILESETS     := topology dbobih trigs transport roads
 
 PROJECT ?= projects/basemap.qgz
 
@@ -127,6 +128,13 @@ data/transport.gpkg: data/scotland.osm.pbf
 		hstore_get_value(other_tags, 'railway') AS railway, hstore_get_value(other_tags, 'station') AS station \
 		FROM points WHERE hstore_get_value(other_tags, 'railway') IN ('station','halt')"
 
+# Main roads (not tracks, paths or service roads), to keep the layer quiet.
+ROAD_TYPES := 'motorway','motorway_link','trunk','trunk_link','primary','primary_link','secondary','secondary_link','tertiary','tertiary_link','unclassified','residential','living_street'
+
+data/roads.gpkg: data/scotland.osm.pbf
+	rm -f $@
+	ogr2ogr -f GPKG $@ $< lines -nln roads -select name,highway -where "highway IN ($(ROAD_TYPES))"
+
 # One label line per water body, along its main axis.
 data/water-names.gpkg: data/water-polygons.gpkg scripts/water_centerlines.py
 	$(QGIS_PYTHON) scripts/water_centerlines.py $< $@
@@ -163,9 +171,12 @@ trigs: sources/trigs.csv
 transport: data/transport.gpkg
 	$(RENDER) --tileset transport --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
 
+roads: data/roads.gpkg
+	$(RENDER) --tileset roads --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
+
 tiles: $(TILESETS) waternames
 
-sample: $(DATA_FILES) $(WATERNAMES_JSON) data/transport.gpkg
+sample: $(DATA_FILES) $(WATERNAMES_JSON) data/transport.gpkg data/roads.gpkg
 	for t in $(TILESETS); do \
 		$(RENDER) --tileset $$t --extent=$(SAMPLE_BBOX) --zmin $(SAMPLE_ZMIN) --zmax $(SAMPLE_ZMAX) || exit 1; \
 	done
@@ -177,7 +188,7 @@ sample: $(DATA_FILES) $(WATERNAMES_JSON) data/transport.gpkg
 clean:
 	rm -rf data/tiles data/merged-dem.tif data/hill-shade-merged.tif \
 		data/contours-merged.gpkg data/merged.vrt data/water-polygons.gpkg \
-		data/water-names.gpkg data/transport.gpkg
+		data/water-names.gpkg data/transport.gpkg data/roads.gpkg
 
 # Also removes the downloaded DEM zips and unpacked HGT files.
 distclean: clean

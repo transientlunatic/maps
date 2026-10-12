@@ -58,6 +58,18 @@ TILESETS = {
         },
         "transparent": True,
     },
+    # A quiet road layer (`make data/roads.gpkg`): thin grey lines that stay
+    # behind the railways. Styled with styling/Roads.qml.
+    "roads": {
+        "layers": ["Roads"],
+        "extra_layers": {
+            "Roads": {
+                "source": "data/roads.gpkg|layername=roads",
+                "style": "styling/Roads.qml",
+            },
+        },
+        "transparent": True,
+    },
 }
 
 

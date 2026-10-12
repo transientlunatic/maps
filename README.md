@@ -18,6 +18,7 @@ Three tile sets are produced, matching the layers in the site's Leaflet map:
 | `dbobih`   | Hill markers, names and heights (transparent)                         | `data/tiles/dbobih/<version>/{z}/{x}/{y}.png`   |
 | `trigs`    | Ordnance Survey trig points (transparent)                             | `data/tiles/trigs/<version>/{z}/{x}/{y}.png`    |
 | `transport` | Railways (one solid dark grey line) and stations (dark circles with names) (transparent) | `data/tiles/transport/<version>/{z}/{x}/{y}.png` |
+| `roads` | Main roads as thin grey lines, quieter than the railways (transparent) | `data/tiles/roads/<version>/{z}/{x}/{y}.png` |
 | `waternames` | Names of lochs and reservoirs: label lines as GeoJSON (vector), drawn in the browser | `data/tiles/waternames/<version>/water-names.geojson` |
 
 ## Data sources
@@ -121,7 +122,14 @@ them with `styling/Rail Lines.qml` and `styling/Rail Stations.qml`.
 - Stations are dark circles with a white outline, sized by zoom, with bold Lato names; halts
   are slightly smaller and appear from zoom 11.
 
-Roads are not included yet.
+### Roads
+
+The `roads` tile set is a deliberately quiet companion to the railways: thin mid-grey lines with
+no casing or labels, drawn from `data/roads.gpkg` (`make data/roads.gpkg`) with
+`styling/Roads.qml`. Only main roads are included (motorway down to residential), not tracks,
+paths or service roads. Bigger roads are slightly darker and heavier and draw on top; tertiary
+and unclassified roads appear from zoom 11 and residential streets from zoom 13. Add it
+beneath the `transport` layer so the railways stay on top.
 
 ## Editing the styling
 
