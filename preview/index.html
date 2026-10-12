@@ -39,12 +39,13 @@
   const facilities = L.tileLayer(`${tiles}/facilities/${version}/{z}/{x}/{y}.png`, options).addTo(map);
   const rivers = L.tileLayer(`${tiles}/rivers/${version}/{z}/{x}/{y}.png`, options).addTo(map);
   const paths = L.tileLayer(`${tiles}/paths/${version}/{z}/{x}/{y}.png`, options).addTo(map);
+  const crags = L.tileLayer(`${tiles}/crags/${version}/{z}/{x}/{y}.png`, options).addTo(map);
   const shelters = L.tileLayer(`${tiles}/shelters/${version}/{z}/{x}/{y}.png`, options).addTo(map);
   const transport = L.tileLayer(`${tiles}/transport/${version}/{z}/{x}/{y}.png`, options).addTo(map);
   const water = new WaterNames(`${tiles}/waternames/${version}/water-names.geojson`).addTo(map);
 
   L.control.layers({ Topology: topology, 'Imhof style': imhof }, {
-    'Forest': forests, 'Valley mist': mist, 'Hills': hills, 'Trig points': trigs, 'Roads': roads, 'Railways and stations': transport, 'Facilities': facilities, 'Rivers and waterfalls': rivers, 'Paths': paths, 'Bothies and shelters': shelters, 'Water names': water,
+    'Forest': forests, 'Valley mist': mist, 'Hills': hills, 'Trig points': trigs, 'Roads': roads, 'Railways and stations': transport, 'Facilities': facilities, 'Rivers and waterfalls': rivers, 'Paths': paths, 'Crags and scree': crags, 'Bothies and shelters': shelters, 'Water names': water,
   }).addTo(map);
 </script>
 </body>

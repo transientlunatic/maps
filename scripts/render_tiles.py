@@ -163,6 +163,22 @@ TILESETS = {
         },
         "transparent": True,
     },
+    # Crags, scree and bare rock (`make data/crags.gpkg`), styled with styling/Cliffs.qml and
+    # styling/Rock.qml.
+    "crags": {
+        "layers": ["Cliffs", "Rock"],
+        "extra_layers": {
+            "Rock": {
+                "source": "data/crags.gpkg|layername=rock",
+                "style": "styling/Rock.qml",
+            },
+            "Cliffs": {
+                "source": "data/crags.gpkg|layername=cliffs",
+                "style": "styling/Cliffs.qml",
+            },
+        },
+        "transparent": True,
+    },
     # Footpaths, tracks and bridleways (`make data/paths.gpkg`), styled with styling/Paths.qml.
     "paths": {
         "layers": ["Paths"],

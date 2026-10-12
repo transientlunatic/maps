@@ -51,7 +51,7 @@ SAMPLE_ZMAX ?= 12
 TILE_VERSION ?= dev
 TILE_DIR     ?= data/tiles
 # Raster tile sets rendered by QGIS; the water names are vector data (below)
-TILESETS     := topology imhof forests mist elevmist dbobih trigs transport roads shelters paths rivers facilities
+TILESETS     := topology imhof forests mist elevmist dbobih trigs transport roads shelters paths rivers facilities crags
 
 PROJECT ?= projects/basemap.qgz
 
@@ -208,6 +208,17 @@ data/paths.gpkg: data/scotland.osm.pbf
 		AND COALESCE(hstore_get_value(other_tags, 'foot'), '') <> 'no' \
 		AND COALESCE(hstore_get_value(other_tags, 'access'), '') NOT IN ('private','no')"
 
+# Crags: cliffs (natural=cliff, a line with the drop on its right), scree and bare rock
+# (natural=scree, bare_rock, rock) as polygons. Uses scripts/osmconf.ini for the `natural` column.
+OGR_CRAGS := ogr2ogr -f GPKG --config OSM_CONFIG_FILE scripts/osmconf.ini -dialect SQLITE
+
+data/crags.gpkg: data/scotland.osm.pbf scripts/osmconf.ini
+	rm -f $@
+	$(OGR_CRAGS) $@ $< -nln cliffs -sql "SELECT geometry, name FROM lines WHERE hstore_get_value(other_tags, 'natural') = 'cliff'"
+	$(OGR_CRAGS) -update $@ $< -nln rock -nlt MULTIPOLYGON -sql "SELECT geometry, name, \
+		CASE WHEN \"natural\" = 'scree' THEN 'scree' ELSE 'bare_rock' END AS kind FROM multipolygons \
+		WHERE \"natural\" IN ('scree','bare_rock','rock')"
+
 # Bothies (tourism=wilderness_hut, bothy=yes) and shelters (amenity=shelter, leaving
 # out bus shelters and picnic shelters), as points: mapped buildings are reduced to
 # a point inside them. Uses scripts/osmconf.ini so the tags are real columns.
@@ -292,6 +303,9 @@ roads: data/roads.gpkg
 shelters: data/shelters.gpkg
 	$(RENDER) --tileset shelters --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
 
+crags: data/crags.gpkg
+	$(RENDER) --tileset crags --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
+
 paths: data/paths.gpkg
 	$(RENDER) --tileset paths --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
 
@@ -303,7 +317,7 @@ facilities: data/facilities.gpkg
 
 tiles: $(TILESETS) waternames
 
-sample: $(DATA_FILES) $(WATERNAMES_JSON) data/transport.gpkg data/roads.gpkg data/shelters.gpkg data/paths.gpkg data/rivers.gpkg data/facilities.gpkg
+sample: $(DATA_FILES) $(WATERNAMES_JSON) data/transport.gpkg data/roads.gpkg data/shelters.gpkg data/paths.gpkg data/rivers.gpkg data/facilities.gpkg data/crags.gpkg
 	for t in $(TILESETS); do \
 		$(RENDER) --tileset $$t --extent=$(SAMPLE_BBOX) --zmin $(SAMPLE_ZMIN) --zmax $(SAMPLE_ZMAX) || exit 1; \
 	done
@@ -331,7 +345,7 @@ clean:
 		data/dem-bng.tif data/hill-shade-bng.tif data/hill-shade-multi-bng.tif \
 		data/imhof-shade.tif data/imhof-shade-3x.tif \
 		data/contours-merged.gpkg data/merged.vrt data/mist.tif data/sea.gpkg data/water-polygons.gpkg \
-		data/water-names.gpkg data/transport.gpkg data/roads.gpkg data/shelters.gpkg data/paths.gpkg data/rivers.gpkg data/facilities.gpkg
+		data/water-names.gpkg data/transport.gpkg data/roads.gpkg data/shelters.gpkg data/paths.gpkg data/rivers.gpkg data/facilities.gpkg data/crags.gpkg
 
 # Also removes the downloaded DEM zips and unpacked HGT files.
 distclean: clean

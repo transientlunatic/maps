@@ -99,7 +99,7 @@ jobs:
       - name: Build the OSM data
         run: |
           make data/transport.gpkg data/roads.gpkg data/shelters.gpkg data/paths.gpkg \
-            data/rivers.gpkg data/facilities.gpkg
+            data/rivers.gpkg data/facilities.gpkg data/crags.gpkg
 
       # The loch names are vector data, so they are finished here rather than rendered
       - name: Build the loch names
@@ -133,6 +133,7 @@ jobs:
             data/paths.gpkg
             data/rivers.gpkg
             data/facilities.gpkg
+            data/crags.gpkg
           retention-days: 1
           compression-level: 1
 
