@@ -12,12 +12,12 @@ the release tag for release builds (`make TILE_VERSION=v1.2 ...`).
 
 Each layer is a separate set of transparent tiles (apart from the topology, which is opaque),
 so a map can switch them on and off. A good stacking order, bottom to top, is topology (or the Imhof style), forests, mist, roads,
-paths, rivers, loch names, railways, shelters, facilities, hills, trig points. The zoom a feature
+paths, rivers, loch names, railways, shelters, facilities, crags, hills, trig points. The zoom a feature
 first appears at is described under each layer's section further down.
 
 | Layer | Sample |
 |---|---|
-| **Topology** (`topology`)<br><br>Terrain, drawn as hypsometric tints with soft hillshade, 50 m contours and water (forest is its own layer, below). Below 200 m the tints run from pale green to beige so hills show in flat country; above that they step through tan to brown. Zoom 9–13. Data: SRTM-derived DEM, OpenStreetMap. | <img src="docs/samples/topology.png" width="420" alt="Topology"> |
+| **Topology** (`topology`)<br><br>Terrain, drawn as hypsometric tints with soft hillshade tinted blue-violet in the shadows (as in the Imhof style, but lighter), 50 m contours and water (forest is its own layer, below). Below 200 m the tints run from pale green to beige so hills show in flat country; above that they step through tan to brown. Zoom 9–13. Data: SRTM-derived DEM, OpenStreetMap. | <img src="docs/samples/topology.png" width="420" alt="Topology"> |
 | **Imhof style** (`imhof`)<br><br>A second basemap, used instead of the topology: no hypsometric tints, but the relief shaded in colour as Eduard Imhof did, warm cream where the light falls and cool blue-violet in shadow, with the valleys veiled in mist that rises to 914 m. Opaque. Zoom 9–13. Data: derived from the DEM. | <img src="docs/samples/imhof.png" width="420" alt="Imhof style"> |
 | **Forests** (`forests`)<br><br>Woodland as dark green blurred patches, in a transparent overlay so it can be switched off. Blend it with `mix-blend-mode: multiply` (the preview page does) so the hillshade and contours still show through the trees. Zoom 9–13. Data: OpenStreetMap, via the project's `OSM - Forestry` layer. | <img src="docs/samples/forests.png" width="420" alt="Forests"> |
 | **Valley mist** (`mist`)<br><br>A pale blue haze that collects on valley floors in rugged country and thins up the slopes, after Eduard Imhof's aerial perspective: valleys recede and the summits stand out. Strongest zoomed out and fading as you zoom in (gone by zoom 13). Data: derived from the DEM. | <img src="docs/samples/mist.png" width="420" alt="Valley mist"> |
@@ -30,6 +30,7 @@ first appears at is described under each layer's section further down.
 | **Rivers and waterfalls** (`rivers`)<br><br>Rivers, streams and canals in the same pale blue as the base map's water, with named rivers and burns labelled along the line, and waterfalls as blue triangles. Data: OpenStreetMap. | <img src="docs/samples/rivers.png" width="420" alt="Rivers and waterfalls"> |
 | **Loch names** (`waternames`)<br><br>The name of each loch and reservoir, curved along its main axis. Unlike the other layers this is vector data (GeoJSON) drawn in the browser by `preview/water-names.js`, so the text is sharp and uses the page's fonts. Data: OpenStreetMap. | <img src="docs/samples/waternames.png" width="420" alt="Loch names"> |
 | **Bothies and shelters** (`shelters`)<br><br>Bothies as solid blue discs, visible at every zoom, and shelters as smaller hollow discs from zoom 12, with names. Data: OpenStreetMap. | <img src="docs/samples/shelters.png" width="420" alt="Bothies and shelters"> |
+| **Crags and scree** (`crags`)<br><br>Cliffs as a dark line with ticks on the drop side, scree as stippling and bare rock as hatching, in dark brown ink so the rock reads on any slope. Data: OpenStreetMap. | <img src="docs/samples/crags.png" width="420" alt="Crags and scree"> |
 | **Trailheads and facilities** (`facilities`)<br><br>Car parks, campsites, hostels, visitor centres, viewpoints, mountain rescue posts, toilets and ferry terminals as small coloured symbols, plus ferry routes. Data: OpenStreetMap. | <img src="docs/samples/facilities.png" width="420" alt="Trailheads and facilities"> |
 
 The samples were made with `make samples` (the loch names sample is a screenshot of
@@ -209,6 +210,22 @@ The extraction uses `scripts/osmconf.ini`, which has the extra OSM tags as colum
 
 Bus stops are not included yet.
 
+## Crags and scree
+
+The `crags` tile set (`make data/crags.gpkg`, styled by `styling/Cliffs.qml` and `styling/Rock.qml`)
+draws the rock that walkers and scramblers care about, from OSM:
+
+- **Cliffs**: `natural=cliff` ways, drawn as a thin dark line with short ticks on the drop side.
+  OSM draws cliffs with the drop on the right of the way's direction, and the ticks follow it.
+- **Scree**: `natural=scree` areas, as stippling over a faint warm wash.
+- **Bare rock**: `natural=bare_rock` and `natural=rock` areas, as fine diagonal hatching with an outline.
+
+All of it is dark brown (`#34261e`) rather than grey, so it stays readable over both the tan and the
+shaded slopes. Cliff coverage in OSM is patchy, so this shows only what has been mapped; a
+slope-derived layer from the DEM could fill the gaps (the 90 m DEM is coarse for single crags).
+The sample was made from the ESRI OSM tiles, because the OSM extract was not available when it was
+made, so its tile edges show as straight lines; the real extract will not have them.
+
 ## Bothies and shelters
 
 The `shelters` tile set (`make data/shelters.gpkg`, styled by `styling/Shelters.qml`) marks
@@ -344,6 +361,27 @@ the ridges above them:
 The constants at the top of the script control this; the colour and strength are in the QML. The
 tile set is faded with zoom (`opacity_by_zoom` in `scripts/render_tiles.py`) so that it hazes the
 overview but not close-up detail. Put it above the topology and forests and below everything else.
+
+## Publishing to the tile server
+
+On a release, the `publish` job copies the finished tiles to the tile server
+(tiles.daniel-williams.co.uk, an Apache server on Dreamhost) with rsync over ssh, using
+`scripts/publish_tiles.sh`. It unpacks every shard into one tree and copies it, so
+`{tileset}/{release tag}/...` appears next to the older versions; nothing is deleted. It also
+puts a small `.htaccess` in `waternames/`, which lets the blog fetch the loch names from another
+origin (CORS) and serves the GeoJSON with the right type.
+
+To set it up, add these to the repository (Settings, Secrets and variables, Actions):
+
+| Name | Kind | What |
+|---|---|---|
+| `SSH_KEY` | secret | a private key that can log in to the server (the blog's deploy key works) |
+| `SSH_HOST` | secret | the server's host name |
+| `SSH_USER` | secret | the ssh user |
+| `TILES_PATH` | variable (optional) | the tile server's directory on that host; defaults to `/home/danwilliams/tiles.daniel-williams.co.uk/` |
+
+If a secret is missing the job is skipped with a notice, and the release still builds. The
+same script works by hand: `scripts/publish_tiles.sh <directory of shard archives> user@host:/path/`.
 
 ## Notes
 

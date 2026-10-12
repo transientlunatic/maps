@@ -20,6 +20,7 @@ on:
 #   data     build the data files once (DEM, hillshade, contours, OSM extracts, loch names)
 #   tiles    render every tile set for one shard (a slice of the area) per job
 #   release  attach all the shards to the release (releases only)
+#   publish  copy the tiles to the tile server over ssh (releases only)
 # A full build is cut into SHARD_COLS x SHARD_ROWS shards (repository variables, 2 x 4 by
 # default). Shards follow zoom 9 tile edges, so their tiles never overlap.
 jobs:
@@ -98,7 +99,7 @@ jobs:
       - name: Build the OSM data
         run: |
           make data/transport.gpkg data/roads.gpkg data/shelters.gpkg data/paths.gpkg \
-            data/rivers.gpkg data/facilities.gpkg
+            data/rivers.gpkg data/facilities.gpkg data/crags.gpkg
 
       # The loch names are vector data, so they are finished here rather than rendered
       - name: Build the loch names
@@ -132,6 +133,7 @@ jobs:
             data/paths.gpkg
             data/rivers.gpkg
             data/facilities.gpkg
+            data/crags.gpkg
           retention-days: 1
           compression-level: 1
 
@@ -216,3 +218,50 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: assets/*.tar.gz
+
+  # Copy the tiles to the tile server, next to the older versions. It needs the repository
+  # secrets SSH_KEY (a private key), SSH_HOST and SSH_USER, and optionally the repository
+  # variable TILES_PATH (the tile server's directory on that host). Without the secrets the
+  # job is skipped, so releases still work before the server is set up.
+  publish:
+    if: github.event_name == 'release'
+    needs: [plan, tiles, data]
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    concurrency:
+      group: publish-tiles
+      cancel-in-progress: false
+    env:
+      SSH_KEY: ${{ secrets.SSH_KEY }}
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+      TILES_PATH: ${{ vars.TILES_PATH || '/home/danwilliams/tiles.daniel-williams.co.uk/' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check the tile server settings
+        id: settings
+        run: |
+          if [ -z "$SSH_KEY" ] || [ -z "$SSH_HOST" ] || [ -z "$SSH_USER" ]; then
+            echo "::notice::SSH_KEY, SSH_HOST or SSH_USER is not set, so the tiles were not published"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download all the tile shards
+        if: steps.settings.outputs.skip != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tiles-*
+          path: assets
+          merge-multiple: true
+
+      - name: Publish to the tile server
+        if: steps.settings.outputs.skip != 'true'
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/tile_server_key
+          chmod 600 ~/.ssh/tile_server_key
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
+          export RSYNC_RSH="ssh -i $HOME/.ssh/tile_server_key"
+          scripts/publish_tiles.sh assets "$SSH_USER@$SSH_HOST:$TILES_PATH"

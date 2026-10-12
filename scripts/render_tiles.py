@@ -28,9 +28,17 @@ TILESETS = {
             "Sea",
             "OSM - Water",
             "merged-hillshade-315",
+            "Shadow Tint",
             "merged-dem",
         ],
         "extra_layers": {
+            # Cool blue-violet in the shadows (multiplied over the DEM colours, so lit slopes
+            # are untouched), from the same shading value as the Imhof style
+            "Shadow Tint": {
+                "type": "raster",
+                "source": "data/imhof-shade-3x.tif",
+                "style": "styling/Shadow Tint.qml",
+            },
             "Sea": {
                 "source": "data/sea.gpkg|layername=sea",
                 "style": "styling/Sea.qml",
@@ -39,6 +47,8 @@ TILESETS = {
         # Styles from styling/ that replace the project's own for these layers.
         # The DEM ramp has extra levels below 200 m (see scripts/lowland_ramp.py).
         "styles": {"merged-dem": "styling/merged-dem.qml"},
+        # The grey hillshade is eased back a little because the tint now shades as well
+        "layer_opacity": {"merged-hillshade-315": 0.6},
         # Sharp coastlines: the project's sea is a coarse polygon that its style blurs. The
         # "Sea" layer (from the DEM, `make data/sea.gpkg`) replaces it. (The forest keeps
         # its soft edge.)
@@ -149,6 +159,22 @@ TILESETS = {
             "Shelters": {
                 "source": "data/shelters.gpkg|layername=shelters",
                 "style": "styling/Shelters.qml",
+            },
+        },
+        "transparent": True,
+    },
+    # Crags, scree and bare rock (`make data/crags.gpkg`), styled with styling/Cliffs.qml and
+    # styling/Rock.qml.
+    "crags": {
+        "layers": ["Cliffs", "Rock"],
+        "extra_layers": {
+            "Rock": {
+                "source": "data/crags.gpkg|layername=rock",
+                "style": "styling/Rock.qml",
+            },
+            "Cliffs": {
+                "source": "data/crags.gpkg|layername=cliffs",
+                "style": "styling/Cliffs.qml",
             },
         },
         "transparent": True,
@@ -316,6 +342,9 @@ def main():
         if not ok:
             sys.exit(f"Could not load style {extra['style']}")
         project.addMapLayer(layer)
+
+    for name, opacity in spec.get("layer_opacity", {}).items():
+        project.mapLayersByName(name)[0].setOpacity(opacity)
 
     # Switch off everything, then switch on this tile set's layers.
     root = project.layerTreeRoot()

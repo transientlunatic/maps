@@ -36,6 +36,7 @@ SAMPLES = {
     "transport": (-4.30, 55.86, 13, ["topology", "forests", "roads", "transport"]),
     "paths": (-3.80, 57.17, 13, ["topology", "forests", "paths"]),
     "rivers": (-4.42, 56.35, 12, ["topology", "forests", "rivers"]),
+    "crags": (-4.98, 56.80, 13, ["topology", "forests", "crags"]),
     "shelters": (-3.64, 57.08, 12, ["topology", "forests", "shelters"]),
     "facilities": (-3.68, 57.145, 12, ["topology", "forests", "facilities"]),
 }
@@ -54,6 +55,7 @@ NEEDS = {
     "paths": ["data/paths.gpkg"],
     "rivers": ["data/rivers.gpkg"],
     "shelters": ["data/shelters.gpkg"],
+    "crags": ["data/crags.gpkg"],
     "facilities": ["data/facilities.gpkg"],
 }
 
