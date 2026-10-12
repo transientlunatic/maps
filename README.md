@@ -11,7 +11,7 @@ Each build goes in a version directory (`<version>` below): `dev` by default, or
 the release tag for release builds (`make TILE_VERSION=v1.2 ...`).
 
 Each layer is a separate set of transparent tiles (apart from the topology, which is opaque),
-so a map can switch them on and off. A good stacking order, bottom to top, is topology, forests, roads,
+so a map can switch them on and off. A good stacking order, bottom to top, is topology, forests, mist, roads,
 paths, rivers, loch names, railways, shelters, facilities, hills, trig points. The zoom a feature
 first appears at is described under each layer's section further down.
 
@@ -19,6 +19,7 @@ first appears at is described under each layer's section further down.
 |---|---|
 | **Topology** (`topology`)<br><br>Terrain, drawn as hypsometric tints with soft hillshade, 50 m contours and water (forest is its own layer, below). Below 200 m the tints run from pale green to beige so hills show in flat country; above that they step through tan to brown. Zoom 9–13. Data: SRTM-derived DEM, OpenStreetMap. | <img src="docs/samples/topology.png" width="420" alt="Topology"> |
 | **Forests** (`forests`)<br><br>Woodland as dark green blurred patches, in a transparent overlay so it can be switched off. Blend it with `mix-blend-mode: multiply` (the preview page does) so the hillshade and contours still show through the trees. Zoom 9–13. Data: OpenStreetMap, via the project's `OSM - Forestry` layer. | <img src="docs/samples/forests.png" width="420" alt="Forests"> |
+| **Valley mist** (`mist`)<br><br>A pale blue haze that collects on valley floors in rugged country and thins up the slopes, after Eduard Imhof's aerial perspective: valleys recede and the summits stand out. Strongest zoomed out and fading as you zoom in (gone by zoom 13). Data: derived from the DEM. | <img src="docs/samples/mist.png" width="420" alt="Valley mist"> |
 | **Hills** (`dbobih`)<br><br>Hill markers with names and heights from the Database of British and Irish Hills, as a transparent overlay. Zoom 9–13. Data: DoBIH. | <img src="docs/samples/dbobih.png" width="420" alt="Hills"> |
 | **Trig points** (`trigs`)<br><br>Ordnance Survey triangulation pillars, as a transparent overlay. Zoom 9–13. Data: `sources/trigs.csv`. | <img src="docs/samples/trigs.png" width="420" alt="Trig points"> |
 | **Roads** (`roads`)<br><br>A deliberately quiet layer of thin grey lines. Zoomed out only motorways, trunk and primary roads show; smaller roads join as you zoom in, down to residential streets at zoom 13. Data: OpenStreetMap. | <img src="docs/samples/roads.png" width="420" alt="Roads"> |
@@ -278,6 +279,23 @@ unchanged, so mountains look as before. Change `LOW`, `HIGH` or `BREAKS` in the 
 `scripts/render_tiles.py` applies this QML to the topology tiles. `projects/basemap.qgz` still has
 the old ramp, so load `styling/merged-dem.qml` onto the `merged-dem` layer in QGIS (or run
 `make apply-styles` and save) to see the same colours there.
+
+## Valley mist
+
+`make data/mist.tif` (`scripts/make_mist.py`) turns the DEM into a mist density map, which
+`styling/Valley Mist.qml` colours as a pale blue-grey haze with the density as its opacity. The
+density follows Eduard Imhof's aerial perspective, where valleys are drawn hazier and cooler than
+the ridges above them:
+
+- it is highest on the valley floor, found as the lowest ground within 3 km, and fades to nothing
+  220 m above it, so a high glen fills with mist as well as a low one;
+- it thins with altitude and is gone above about 800 m;
+- it only forms in rugged country (local relief over a few hundred metres), so a lowland plain
+  does not get a blanket of haze.
+
+The constants at the top of the script control this; the colour and strength are in the QML. The
+tile set is faded with zoom (`opacity_by_zoom` in `scripts/render_tiles.py`) so that it hazes the
+overview but not close-up detail. Put it above the topology and forests and below everything else.
 
 ## Notes
 

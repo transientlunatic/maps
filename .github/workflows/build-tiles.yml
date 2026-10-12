@@ -123,6 +123,7 @@ jobs:
             data/merged-dem.tif
             data/hill-shade-merged.tif
             data/contours-merged.gpkg
+            data/mist.tif
             data/transport.gpkg
             data/roads.gpkg
             data/shelters.gpkg
