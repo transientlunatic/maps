@@ -287,8 +287,9 @@ made coastlines soft (and hid how generalised they are). The topology tiles draw
 instead: `scripts/make_sea.py` (`make data/sea.gpkg`) takes the part of the DEM at or below sea
 level (the DEM is 0 over the sea), contours its edge at 0.5 m so the coast follows the shoreline
 to a fraction of a pixel, and lightly smooths it. `styling/Sea.qml` fills it with the project's sea
-colour, and `scripts/render_tiles.py` switches off the project's own sea and beach polygons. Lakes
-and the forest keep their soft edges. The coast is as accurate as the 3 arc second DEM, about 90 m.
+colour with a light blur (level 0.8, about a third of the project's old blur) so the edge looks hand-drawn
+rather than mechanical, and `scripts/render_tiles.py` switches off the project's own sea and beach
+polygons. Lakes and the forest keep their soft edges. The coast is as accurate as the 3 arc second DEM, about 90 m.
 
 ## Valley mist
 
