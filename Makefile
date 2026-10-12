@@ -5,7 +5,8 @@
 # prepares the data files that the project expects in data/ and then calls
 # scripts/render_tiles.py to produce one XYZ PNG tile tree per tile set:
 #
-#   data/tiles/topology/<version>/{z}/{x}/{y}.png   terrain, contours, water, forest
+#   data/tiles/topology/<version>/{z}/{x}/{y}.png   terrain, contours and water
+#   data/tiles/forests/<version>/{z}/{x}/{y}.png    forest (use mix-blend-mode: multiply)
 #   data/tiles/dbobih/<version>/{z}/{x}/{y}.png     hill markers and names
 #   data/tiles/trigs/<version>/{z}/{x}/{y}.png      trig points
 #   data/tiles/transport/<version>/{z}/{x}/{y}.png  railways and stations
@@ -47,7 +48,7 @@ SAMPLE_ZMAX ?= 12
 TILE_VERSION ?= dev
 TILE_DIR     ?= data/tiles
 # Raster tile sets rendered by QGIS; the water names are vector data (below)
-TILESETS     := topology dbobih trigs transport roads shelters paths rivers facilities
+TILESETS     := topology forests dbobih trigs transport roads shelters paths rivers facilities
 
 PROJECT ?= projects/basemap.qgz
 
@@ -226,6 +227,9 @@ DATA_FILES := data/merged-dem.tif data/hill-shade-merged.tif data/contours-merge
 
 topology: $(DATA_FILES)
 	$(RENDER) --tileset topology --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
+
+forests:
+	$(RENDER) --tileset forests --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
 
 dbobih: sources/dobih.csv
 	$(RENDER) --tileset dbobih --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)

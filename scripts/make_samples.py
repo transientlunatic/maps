@@ -15,26 +15,32 @@ import subprocess
 import sys
 import tempfile
 
+import numpy as np
 from PIL import Image
 
 WIDTH, HEIGHT = 640, 400
 
+# Layers that the map blends with multiply (CSS mix-blend-mode), so the terrain shows through
+MULTIPLY = {"forests"}
+
 # name: (centre lon, centre lat, zoom, layers from the bottom up)
 SAMPLES = {
     "topology": (-4.55, 56.10, 11, ["topology"]),
-    "dbobih": (-4.63, 56.19, 12, ["topology", "dbobih"]),
-    "trigs": (-4.32, 56.25, 12, ["topology", "trigs"]),
-    "roads": (-4.31, 55.865, 12, ["topology", "roads"]),
-    "transport": (-4.30, 55.86, 13, ["topology", "roads", "transport"]),
-    "paths": (-3.80, 57.17, 13, ["topology", "paths"]),
-    "rivers": (-4.42, 56.35, 12, ["topology", "rivers"]),
-    "shelters": (-3.64, 57.08, 12, ["topology", "shelters"]),
-    "facilities": (-3.68, 57.145, 12, ["topology", "facilities"]),
+    "forests": (-4.42, 56.35, 12, ["topology", "forests"]),
+    "dbobih": (-4.63, 56.19, 12, ["topology", "forests", "dbobih"]),
+    "trigs": (-4.32, 56.25, 12, ["topology", "forests", "trigs"]),
+    "roads": (-4.31, 55.865, 12, ["topology", "forests", "roads"]),
+    "transport": (-4.30, 55.86, 13, ["topology", "forests", "roads", "transport"]),
+    "paths": (-3.80, 57.17, 13, ["topology", "forests", "paths"]),
+    "rivers": (-4.42, 56.35, 12, ["topology", "forests", "rivers"]),
+    "shelters": (-3.64, 57.08, 12, ["topology", "forests", "shelters"]),
+    "facilities": (-3.68, 57.145, 12, ["topology", "forests", "facilities"]),
 }
 
 # Data each tile set needs (the topology needs the DEM files)
 NEEDS = {
     "topology": ["data/merged-dem.tif", "data/hill-shade-merged.tif", "data/contours-merged.gpkg"],
+    "forests": [],
     "dbobih": ["sources/dobih.csv"],
     "trigs": ["sources/trigs.csv"],
     "roads": ["data/roads.gpkg"],
@@ -89,7 +95,16 @@ def make(name, outdir):
                     path = os.path.join(tmp, tileset, "s", str(zoom), str(x), f"{y}.png")
                     if os.path.exists(path):
                         tile = Image.open(path).convert("RGBA")
-                        canvas.alpha_composite(tile, ((x - x0) * 256, (y - y0) * 256))
+                        at = ((x - x0) * 256, (y - y0) * 256)
+                        if tileset in MULTIPLY:
+                            box = (*at, at[0] + 256, at[1] + 256)
+                            under = np.array(canvas.crop(box)).astype(float)
+                            over = np.array(tile).astype(float)
+                            alpha = over[:, :, 3:4] / 255
+                            under[:, :, :3] = under[:, :, :3] * (1 - alpha) + alpha * under[:, :, :3] * over[:, :, :3] / 255
+                            canvas.paste(Image.fromarray(under.astype("uint8")), at)
+                        else:
+                            canvas.alpha_composite(tile, at)
         ox, oy = int(left - x0 * 256), int(top - y0 * 256)
         image = canvas.crop((ox, oy, ox + WIDTH, oy + HEIGHT)).convert("RGB")
     os.makedirs(outdir, exist_ok=True)
