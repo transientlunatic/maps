@@ -260,7 +260,7 @@ dem: data/merged-dem.tif data/hill-shade-merged.tif data/hill-shade-multi.tif da
 # Tiles (rendered by QGIS)
 # ---------------------------------------------------------------------------
 
-DATA_FILES := data/merged-dem.tif data/hill-shade-merged.tif data/contours-merged.gpkg data/sea.gpkg
+DATA_FILES := data/merged-dem.tif data/hill-shade-merged.tif data/contours-merged.gpkg data/sea.gpkg data/imhof-shade-3x.tif
 
 topology: $(DATA_FILES)
 	$(RENDER) --tileset topology --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
