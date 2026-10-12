@@ -17,7 +17,7 @@ Three tile sets are produced, matching the layers in the site's Leaflet map:
 | `topology` | Hypsometric tints, hillshade, contours, OSM water and forest          | `data/tiles/topology/<version>/{z}/{x}/{y}.png` |
 | `dbobih`   | Hill markers, names and heights (transparent)                         | `data/tiles/dbobih/<version>/{z}/{x}/{y}.png`   |
 | `trigs`    | Ordnance Survey trig points (transparent)                             | `data/tiles/trigs/<version>/{z}/{x}/{y}.png`    |
-| `transport` | Railways (bold, with white sleeper dashes) and stations (red markers with names) (transparent) | `data/tiles/transport/<version>/{z}/{x}/{y}.png` |
+| `transport` | Railways (one solid dark grey line) and stations (dark circles with names) (transparent) | `data/tiles/transport/<version>/{z}/{x}/{y}.png` |
 | `waternames` | Names of lochs and reservoirs: label lines as GeoJSON (vector), drawn in the browser | `data/tiles/waternames/<version>/water-names.geojson` |
 
 ## Data sources
@@ -114,12 +114,12 @@ drawn to stand out against the terrain. It is rendered by QGIS from `data/transp
 water names it is not in `basemap.qgz`: `scripts/render_tiles.py` loads the layers and styles
 them with `styling/Rail Lines.qml` and `styling/Rail Stations.qml`.
 
-- Main lines are near-black with a white casing and white sleeper dashes (from zoom 11), so
-  they read over forest and dark hillshade. Sidings, tunnels (dashed), light rail and
-  narrow gauge (purple), trams (magenta) and the Glasgow subway (grey dashes) are
-  distinguished.
-- Stations are red circles with a white halo and a dark outline, sized by zoom, with
-  bold Lato names; halts are smaller and appear from zoom 11.
+- Every railway is drawn as one solid dark grey line with a thin white edge so it reads over
+  forest. The style deliberately drops detail: no tunnels, bridges or railway types, and
+  sidings, yards and spurs (anything with `service=*`) are left out, which hides the number of
+  tracks.
+- Stations are dark circles with a white outline, sized by zoom, with bold Lato names; halts
+  are slightly smaller and appear from zoom 11.
 
 Roads are not included yet.
 
