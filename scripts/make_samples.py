@@ -26,6 +26,8 @@ MULTIPLY = {"forests"}
 # name: (centre lon, centre lat, zoom, layers from the bottom up)
 SAMPLES = {
     "topology": (-4.55, 56.10, 11, ["topology"]),
+    "imhof": (-4.80, 56.60, 10, ["imhof"]),
+    "elevmist": (-4.80, 56.55, 10, ["topology", "elevmist"]),
     "forests": (-4.42, 56.35, 12, ["topology", "forests"]),
     "mist": (-4.80, 56.55, 10, ["topology", "mist"]),
     "dbobih": (-4.63, 56.19, 12, ["topology", "forests", "dbobih"]),
@@ -42,6 +44,8 @@ SAMPLES = {
 NEEDS = {
     "topology": ["data/merged-dem.tif", "data/hill-shade-merged.tif", "data/contours-merged.gpkg", "data/sea.gpkg"],
     "forests": [],
+    "imhof": ["data/imhof-shade-3x.tif", "data/sea.gpkg"],
+    "elevmist": ["data/merged-dem.tif"],
     "mist": ["data/mist.tif"],
     "dbobih": ["sources/dobih.csv"],
     "trigs": ["sources/trigs.csv"],

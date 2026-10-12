@@ -45,6 +45,44 @@ TILESETS = {
         "replace_sea": "OSM - Water",
         "transparent": False,
     },
+    # A second basemap style, in the manner of Eduard Imhof: no hypsometric tints; the relief is
+    # shaded in colour (warm cream where the light falls, cool blue-violet in shadow) and the
+    # valleys are veiled in a pale mist that rises to 914 m. Use it instead of the topology.
+    "imhof": {
+        "layers": ["Sea", "OSM - Water", "Elevation Mist", "Imhof Shading"],
+        "extra_layers": {
+            "Sea": {
+                "source": "data/sea.gpkg|layername=sea",
+                "style": "styling/Sea.qml",
+            },
+            "Elevation Mist": {
+                "type": "raster",
+                "source": "data/merged-dem.tif",
+                "style": "styling/Elevation Mist.qml",
+            },
+            "Imhof Shading": {
+                "type": "raster",
+                "source": "data/imhof-shade-3x.tif",
+                "style": "styling/Imhof Shading.qml",
+            },
+        },
+        "replace_sea": "OSM - Water",
+        "transparent": False,
+    },
+    # The elevation mist on its own, as a transparent overlay for the topology tiles. It is
+    # thickest at sea level and gone by 914 m (3000 ft), and fades as you zoom in.
+    "elevmist": {
+        "layers": ["Elevation Mist"],
+        "extra_layers": {
+            "Elevation Mist": {
+                "type": "raster",
+                "source": "data/merged-dem.tif",
+                "style": "styling/Elevation Mist.qml",
+            },
+        },
+        "opacity_by_zoom": {9: 1.0, 10: 1.0, 11: 0.85, 12: 0.55, 13: 0.3},
+        "transparent": True,
+    },
     # Forest, drawn from the project's "OSM - Forestry" layer as a transparent overlay so
     # that it can be switched off. Put it above the topology.
     "forests": {
