@@ -95,6 +95,22 @@ TILESETS = {
         },
         "transparent": True,
     },
+    # Named rivers, streams and canals with labels along them, plus waterfalls
+    # (`make data/rivers.gpkg`), styled with styling/Rivers.qml and styling/Waterfalls.qml.
+    "rivers": {
+        "layers": ["Waterfalls", "Rivers"],
+        "extra_layers": {
+            "Rivers": {
+                "source": "data/rivers.gpkg|layername=rivers",
+                "style": "styling/Rivers.qml",
+            },
+            "Waterfalls": {
+                "source": "data/rivers.gpkg|layername=waterfalls",
+                "style": "styling/Waterfalls.qml",
+            },
+        },
+        "transparent": True,
+    },
 }
 
 

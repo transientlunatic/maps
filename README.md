@@ -20,6 +20,7 @@ Three tile sets are produced, matching the layers in the site's Leaflet map:
 | `transport` | Railways (one solid dark grey line) and stations (dark circles with names) (transparent) | `data/tiles/transport/<version>/{z}/{x}/{y}.png` |
 | `roads` | Main roads as thin grey lines, quieter than the railways (transparent) | `data/tiles/roads/<version>/{z}/{x}/{y}.png` |
 | `paths` | Footpaths, bridleways and tracks for walkers, from zoom 12 (transparent) | `data/tiles/paths/<version>/{z}/{x}/{y}.png` |
+| `rivers` | Rivers, streams and canals with names along them, and waterfalls (transparent) | `data/tiles/rivers/<version>/{z}/{x}/{y}.png` |
 | `shelters` | Bothies (blue discs) and shelters (hollow discs) with names (transparent) | `data/tiles/shelters/<version>/{z}/{x}/{y}.png` |
 | `waternames` | Names of lochs and reservoirs: label lines as GeoJSON (vector), drawn in the browser | `data/tiles/waternames/<version>/water-names.geojson` |
 
@@ -154,6 +155,20 @@ without dominating the map.
 
 Where `sac_scale` or `trail_visibility` are not mapped (common in Scotland) a path is drawn as an
 ordinary footpath. Draw it beneath the railways and above the roads.
+
+## Rivers and waterfalls
+
+The `rivers` tile set (`make data/rivers.gpkg`, styled by `styling/Rivers.qml` and
+`styling/Waterfalls.qml`) draws `waterway=river`, `stream` and `canal` as blue lines, leaving out
+underground culverts and ditches. Rivers show from zoom 9 and streams from zoom 12; canals are a
+greyer blue. Named rivers and canals are labelled along the line in italic Lato from zoom 11, and
+named streams (burns) from zoom 13.
+
+Waterfalls (`waterway=waterfall` points) are small blue downward triangles from zoom 12, with
+their names from zoom 13.
+
+The topology tiles already draw some water lines from the ESRI OSM service, so this layer
+overlays slightly stronger blue lines on top of them.
 
 ## Bothies and shelters
 

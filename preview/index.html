@@ -28,13 +28,14 @@
   const hills = L.tileLayer(`${tiles}/dbobih/${version}/{z}/{x}/{y}.png`, options).addTo(map);
   const trigs = L.tileLayer(`${tiles}/trigs/${version}/{z}/{x}/{y}.png`, options);
   const roads = L.tileLayer(`${tiles}/roads/${version}/{z}/{x}/{y}.png`, options).addTo(map);
+  const rivers = L.tileLayer(`${tiles}/rivers/${version}/{z}/{x}/{y}.png`, options).addTo(map);
   const paths = L.tileLayer(`${tiles}/paths/${version}/{z}/{x}/{y}.png`, options).addTo(map);
   const shelters = L.tileLayer(`${tiles}/shelters/${version}/{z}/{x}/{y}.png`, options).addTo(map);
   const transport = L.tileLayer(`${tiles}/transport/${version}/{z}/{x}/{y}.png`, options).addTo(map);
   const water = new WaterNames(`${tiles}/waternames/${version}/water-names.geojson`).addTo(map);
 
   L.control.layers({ Topology: topology }, {
-    'Hills': hills, 'Trig points': trigs, 'Roads': roads, 'Railways and stations': transport, 'Paths': paths, 'Bothies and shelters': shelters, 'Water names': water,
+    'Hills': hills, 'Trig points': trigs, 'Roads': roads, 'Railways and stations': transport, 'Rivers and waterfalls': rivers, 'Paths': paths, 'Bothies and shelters': shelters, 'Water names': water,
   }).addTo(map);
 </script>
 </body>
