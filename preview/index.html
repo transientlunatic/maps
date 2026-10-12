@@ -30,6 +30,7 @@
   const q = new URLSearchParams(location.search);
   const map = L.map('map').setView([+(q.get('lat') || 56.2), +(q.get('lng') || -4.5)], +(q.get('z') || 11));
   const topology = L.tileLayer(`${tiles}/topology/${version}/{z}/{x}/{y}.png`, options).addTo(map);
+  const imhof = L.tileLayer(`${tiles}/imhof/${version}/{z}/{x}/{y}.png`, options);
   const forests = L.tileLayer(`${tiles}/forests/${version}/{z}/{x}/{y}.png`, { ...options, className: 'forest-layer' }).addTo(map);
   const mist = L.tileLayer(`${tiles}/mist/${version}/{z}/{x}/{y}.png`, options).addTo(map);
   const hills = L.tileLayer(`${tiles}/dbobih/${version}/{z}/{x}/{y}.png`, options).addTo(map);
@@ -42,7 +43,7 @@
   const transport = L.tileLayer(`${tiles}/transport/${version}/{z}/{x}/{y}.png`, options).addTo(map);
   const water = new WaterNames(`${tiles}/waternames/${version}/water-names.geojson`).addTo(map);
 
-  L.control.layers({ Topology: topology }, {
+  L.control.layers({ Topology: topology, 'Imhof style': imhof }, {
     'Forest': forests, 'Valley mist': mist, 'Hills': hills, 'Trig points': trigs, 'Roads': roads, 'Railways and stations': transport, 'Facilities': facilities, 'Rivers and waterfalls': rivers, 'Paths': paths, 'Bothies and shelters': shelters, 'Water names': water,
   }).addTo(map);
 </script>

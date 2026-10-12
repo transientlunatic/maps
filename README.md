@@ -11,15 +11,17 @@ Each build goes in a version directory (`<version>` below): `dev` by default, or
 the release tag for release builds (`make TILE_VERSION=v1.2 ...`).
 
 Each layer is a separate set of transparent tiles (apart from the topology, which is opaque),
-so a map can switch them on and off. A good stacking order, bottom to top, is topology, forests, mist, roads,
+so a map can switch them on and off. A good stacking order, bottom to top, is topology (or the Imhof style), forests, mist, roads,
 paths, rivers, loch names, railways, shelters, facilities, hills, trig points. The zoom a feature
 first appears at is described under each layer's section further down.
 
 | Layer | Sample |
 |---|---|
 | **Topology** (`topology`)<br><br>Terrain, drawn as hypsometric tints with soft hillshade, 50 m contours and water (forest is its own layer, below). Below 200 m the tints run from pale green to beige so hills show in flat country; above that they step through tan to brown. Zoom 9–13. Data: SRTM-derived DEM, OpenStreetMap. | <img src="docs/samples/topology.png" width="420" alt="Topology"> |
+| **Imhof style** (`imhof`)<br><br>A second basemap, used instead of the topology: no hypsometric tints, but the relief shaded in colour as Eduard Imhof did, warm cream where the light falls and cool blue-violet in shadow, with the valleys veiled in mist that rises to 914 m. Opaque. Zoom 9–13. Data: derived from the DEM. | <img src="docs/samples/imhof.png" width="420" alt="Imhof style"> |
 | **Forests** (`forests`)<br><br>Woodland as dark green blurred patches, in a transparent overlay so it can be switched off. Blend it with `mix-blend-mode: multiply` (the preview page does) so the hillshade and contours still show through the trees. Zoom 9–13. Data: OpenStreetMap, via the project's `OSM - Forestry` layer. | <img src="docs/samples/forests.png" width="420" alt="Forests"> |
 | **Valley mist** (`mist`)<br><br>A pale blue haze that collects on valley floors in rugged country and thins up the slopes, after Eduard Imhof's aerial perspective: valleys recede and the summits stand out. Strongest zoomed out and fading as you zoom in (gone by zoom 13). Data: derived from the DEM. | <img src="docs/samples/mist.png" width="420" alt="Valley mist"> |
+| **Elevation mist** (`elevmist`)<br><br>A pale blue mist that is thickest at sea level and thins steadily to nothing at 914 m (3,000 ft), as a transparent overlay for the topology tiles (the Imhof style already has it). It fades as you zoom in. Data: the DEM. | <img src="docs/samples/elevmist.png" width="420" alt="Elevation mist"> |
 | **Hills** (`dbobih`)<br><br>Hill markers with names and heights from the Database of British and Irish Hills, as a transparent overlay. Zoom 9–13. Data: DoBIH. | <img src="docs/samples/dbobih.png" width="420" alt="Hills"> |
 | **Trig points** (`trigs`)<br><br>Ordnance Survey triangulation pillars, as a transparent overlay. Zoom 9–13. Data: `sources/trigs.csv`. | <img src="docs/samples/trigs.png" width="420" alt="Trig points"> |
 | **Roads** (`roads`)<br><br>A deliberately quiet layer of thin grey lines. Zoomed out only motorways, trunk and primary roads show; smaller roads join as you zoom in, down to residential streets at zoom 13. Data: OpenStreetMap. | <img src="docs/samples/roads.png" width="420" alt="Roads"> |
@@ -290,6 +292,41 @@ to a fraction of a pixel, and lightly smooths it. `styling/Sea.qml` fills it wit
 colour with a light blur (level 0.8, about a third of the project's old blur) so the edge looks hand-drawn
 rather than mechanical, and `scripts/render_tiles.py` switches off the project's own sea and beach
 polygons. Lakes and the forest keep their soft edges. The coast is as accurate as the 3 arc second DEM, about 90 m.
+
+## The Imhof style
+
+`imhof` is a second basemap, a different way of drawing the same terrain, to use in place of
+`topology`. It follows the approach of Eduard Imhof (see also John Nelson's
+[Imhof-like topography style](https://www.esri.com/arcgis-blog/products/arcgis-pro/mapping/steal-this-imhof-like-topography-style-please)
+for ArcGIS Pro, which colours a traditional and a multidirectional hillshade and adds a mist
+gradient on the DEM): the relief carries the whole picture.
+
+- **Light:** the hillshades are lit from the north-west, at 315 degrees and 45 degrees above the
+  horizon, the usual cartographic convention, so ridges read as ridges. `scripts/make_imhof.py`
+  mixes the traditional hillshade (45%) with the multidirectional one (55%), which keeps ridges and
+  gullies that run towards the light readable.
+- **Colour:** the mix goes through a gradient in `styling/Imhof Shading.qml`: pale warm yellow where
+  the light falls, cream on flat ground, and blue-violet in shadow, instead of darker grey. The
+  shading is enlarged threefold first (`data/imhof-shade-3x.tif`) so that QGIS draws it smoothly
+  when zoomed in.
+- **Mist:** `styling/Elevation Mist.qml` colours the DEM as a pale blue mist, thickest at sea level
+  and gone by 914 m (3,000 ft).
+- **Water:** the sharp sea from the DEM and the project's lakes are drawn above the mist, so water
+  is not veiled.
+
+The hillshades themselves are computed on a metric copy of the DEM (British National Grid), not on
+the lat/lon DEM. A degree of longitude is shorter than a degree of latitude here (by cos 56°, about
+0.56), and ignoring it tilts the apparent direction of the light.
+
+The Esri post could not be fetched while this was written, so the details above come from its
+description in search results, not from the post itself.
+
+## Elevation mist
+
+`elevmist` is the mist from the Imhof style on its own, as a transparent overlay for the topology
+tiles. It is a simple absolute-height mist, unlike the valley mist below, which follows the valley
+floor: it is thickest at sea level and thins to nothing at 914 m, and like the valley mist it
+fades as you zoom in (`opacity_by_zoom` in `scripts/render_tiles.py`).
 
 ## Valley mist
 

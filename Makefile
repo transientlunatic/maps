@@ -8,6 +8,8 @@
 #   data/tiles/topology/<version>/{z}/{x}/{y}.png   terrain, contours and water
 #   data/tiles/forests/<version>/{z}/{x}/{y}.png    forest (use mix-blend-mode: multiply)
 #   data/tiles/mist/<version>/{z}/{x}/{y}.png       valley mist (a pale haze, zoomed out)
+#   data/tiles/elevmist/<version>/{z}/{x}/{y}.png   mist that rises to 914 m (overlay)
+#   data/tiles/imhof/<version>/{z}/{x}/{y}.png      a second basemap style, instead of the topology
 #   data/tiles/dbobih/<version>/{z}/{x}/{y}.png     hill markers and names
 #   data/tiles/trigs/<version>/{z}/{x}/{y}.png      trig points
 #   data/tiles/transport/<version>/{z}/{x}/{y}.png  railways and stations
@@ -49,7 +51,7 @@ SAMPLE_ZMAX ?= 12
 TILE_VERSION ?= dev
 TILE_DIR     ?= data/tiles
 # Raster tile sets rendered by QGIS; the water names are vector data (below)
-TILESETS     := topology forests mist dbobih trigs transport roads shelters paths rivers facilities
+TILESETS     := topology imhof forests mist elevmist dbobih trigs transport roads shelters paths rivers facilities
 
 PROJECT ?= projects/basemap.qgz
 
@@ -61,9 +63,7 @@ OSM_PBF_URL ?= https://download.geofabrik.de/europe/united-kingdom/scotland-late
 QGIS_PYTHON ?= python3
 CONTOUR_INTERVAL ?= 50
 
-# gdaldem needs the horizontal scale in metres per degree for lat/lon DEMs.
-# The vertical exaggeration (Z) is tuned by eye to match the live tiles.
-HILLSHADE_SCALE ?= 111120
+# The vertical exaggeration (Z) of the hillshades is tuned by eye to match the live tiles.
 HILLSHADE_Z     ?= 4
 
 RENDER = QT_QPA_PLATFORM=offscreen $(QGIS_PYTHON) scripts/render_tiles.py \
@@ -98,9 +98,29 @@ data/merged-dem.tif: data/merged.vrt
 		-projwin $(word 1,$(DEM_BBOX)) $(word 4,$(DEM_BBOX)) $(word 3,$(DEM_BBOX)) $(word 2,$(DEM_BBOX)) \
 		$< $@
 
-data/hill-shade-merged.tif: data/merged-dem.tif
+# Hillshades are computed on a metric copy of the DEM (British National Grid). Done on the lat/lon
+# DEM, an east-west metre is longer than a north-south one at Scottish latitudes (cos 56 deg = 0.56),
+# which tilts the apparent direction of the light. The results are warped back onto the DEM grid,
+# so the files keep the names and geometry that the QGIS project expects.
+data/dem-bng.tif: data/merged-dem.tif
+	gdalwarp -q -t_srs EPSG:27700 -tr 60 60 -r cubic -dstnodata -32768 -co COMPRESS=LZW -co TILED=YES $< $@
+
+data/hill-shade-bng.tif: data/dem-bng.tif
 	gdaldem hillshade $< $@ -of GTiff -co COMPRESS=LZW -co TILED=YES \
-		-compute_edges -s $(HILLSHADE_SCALE) -z $(HILLSHADE_Z) -az 315 -alt 45
+		-compute_edges -s 1 -z $(HILLSHADE_Z) -az 315 -alt 45
+
+data/hill-shade-multi-bng.tif: data/dem-bng.tif
+	gdaldem hillshade $< $@ -of GTiff -co COMPRESS=LZW -co TILED=YES \
+		-compute_edges -s 1 -z $(HILLSHADE_Z) -multidirectional
+
+# Warp a metric hillshade onto the DEM's grid (a blank copy of the DEM grid, then warped into)
+data/hill-shade-merged.tif: data/hill-shade-bng.tif data/merged-dem.tif
+	gdal_translate -q -ot Byte -scale 0 1 0 0 -a_nodata none -co COMPRESS=LZW -co TILED=YES data/merged-dem.tif $@
+	gdalwarp -q -r cubic $< $@
+
+data/hill-shade-multi.tif: data/hill-shade-multi-bng.tif data/merged-dem.tif
+	gdal_translate -q -ot Byte -scale 0 1 0 0 -a_nodata none -co COMPRESS=LZW -co TILED=YES data/merged-dem.tif $@
+	gdalwarp -q -r cubic $< $@
 
 data/contours-merged.gpkg: data/merged-dem.tif
 	rm -f $@
@@ -218,6 +238,14 @@ $(WATERNAMES_JSON): data/water-names.gpkg
 
 waternames: $(WATERNAMES_JSON)
 
+# The shading value for the Imhof basemap style (see scripts/make_imhof.py), and a threefold
+# enlarged copy of it, which QGIS draws smoothly where it would show the cells of the original
+data/imhof-shade.tif: data/hill-shade-merged.tif data/hill-shade-multi.tif scripts/make_imhof.py
+	$(QGIS_PYTHON) scripts/make_imhof.py data/hill-shade-merged.tif data/hill-shade-multi.tif $@
+
+data/imhof-shade-3x.tif: data/imhof-shade.tif
+	gdal_translate -q -outsize 300% 300% -r cubic -co COMPRESS=LZW -co PREDICTOR=2 -co TILED=YES -co BIGTIFF=IF_SAFER $< $@
+
 # Sea polygons with a detailed coastline, from the DEM (see scripts/make_sea.py)
 data/sea.gpkg: data/merged-dem.tif scripts/make_sea.py
 	$(QGIS_PYTHON) scripts/make_sea.py $< $@
@@ -226,7 +254,7 @@ data/sea.gpkg: data/merged-dem.tif scripts/make_sea.py
 data/mist.tif: data/merged-dem.tif scripts/make_mist.py
 	$(QGIS_PYTHON) scripts/make_mist.py $< $@
 
-dem: data/merged-dem.tif data/hill-shade-merged.tif data/contours-merged.gpkg data/mist.tif data/sea.gpkg
+dem: data/merged-dem.tif data/hill-shade-merged.tif data/hill-shade-multi.tif data/contours-merged.gpkg data/mist.tif data/sea.gpkg data/imhof-shade-3x.tif
 
 # ---------------------------------------------------------------------------
 # Tiles (rendered by QGIS)
@@ -236,6 +264,12 @@ DATA_FILES := data/merged-dem.tif data/hill-shade-merged.tif data/contours-merge
 
 topology: $(DATA_FILES)
 	$(RENDER) --tileset topology --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
+
+imhof: data/imhof-shade-3x.tif data/sea.gpkg
+	$(RENDER) --tileset imhof --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
+
+elevmist: data/merged-dem.tif
+	$(RENDER) --tileset elevmist --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
 
 mist: data/mist.tif
 	$(RENDER) --tileset mist --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
@@ -293,7 +327,9 @@ samples:
 # ---------------------------------------------------------------------------
 
 clean:
-	rm -rf data/tiles data/merged-dem.tif data/hill-shade-merged.tif \
+	rm -rf data/tiles data/merged-dem.tif data/hill-shade-merged.tif data/hill-shade-multi.tif \
+		data/dem-bng.tif data/hill-shade-bng.tif data/hill-shade-multi-bng.tif \
+		data/imhof-shade.tif data/imhof-shade-3x.tif \
 		data/contours-merged.gpkg data/merged.vrt data/mist.tif data/sea.gpkg data/water-polygons.gpkg \
 		data/water-names.gpkg data/transport.gpkg data/roads.gpkg data/shelters.gpkg data/paths.gpkg data/rivers.gpkg data/facilities.gpkg
 
