@@ -8,6 +8,7 @@
 #   data/tiles/topology/<version>/{z}/{x}/{y}.png   terrain, contours, water, forest
 #   data/tiles/dbobih/<version>/{z}/{x}/{y}.png     hill markers and names
 #   data/tiles/trigs/<version>/{z}/{x}/{y}.png      trig points
+#   data/tiles/transport/<version>/{z}/{x}/{y}.png  railways and stations
 #   data/tiles/waternames/<version>/water-names.geojson
 #                                            names of lochs, as lines to label (vector)
 #
@@ -41,11 +42,11 @@ SAMPLE_ZMAX ?= 12
 TILE_VERSION ?= dev
 TILE_DIR     ?= data/tiles
 # Raster tile sets rendered by QGIS; the water names are vector data (below)
-TILESETS     := topology dbobih trigs
+TILESETS     := topology dbobih trigs transport
 
 PROJECT ?= projects/basemap.qgz
 
-# OpenStreetMap extract used for the names of lochs and other bodies of water.
+# OpenStreetMap extract used for the names of lochs and for railways and stations.
 OSM_PBF_URL ?= https://download.geofabrik.de/europe/united-kingdom/scotland-latest.osm.pbf
 
 # Python interpreter that can `import qgis` (on Debian/Ubuntu this is the
@@ -113,6 +114,19 @@ data/water-polygons.gpkg: data/scotland.osm.pbf
 	ogr2ogr -f GPKG $@ $< multipolygons -nln multipolygons -select name \
 		-where "name IS NOT NULL AND (\"natural\" = 'water' OR landuse = 'reservoir')"
 
+# Railways and railway stations from the same extract. Station and track details
+# (railway=*, service=*, tunnel=* ...) are in the other_tags column.
+RAIL_TYPES := 'rail','light_rail','narrow_gauge','tram','subway','preserved','funicular'
+
+data/transport.gpkg: data/scotland.osm.pbf
+	rm -f $@
+	ogr2ogr -f GPKG $@ $< -dialect SQLITE -nln rail_lines -sql "SELECT geometry, name, railway, \
+		hstore_get_value(other_tags, 'service') AS service, hstore_get_value(other_tags, 'usage') AS usage, \
+		hstore_get_value(other_tags, 'tunnel') AS tunnel FROM lines WHERE railway IN ($(RAIL_TYPES))"
+	ogr2ogr -f GPKG -update -append $@ $< -dialect SQLITE -nln rail_stations -sql "SELECT geometry, name, \
+		hstore_get_value(other_tags, 'railway') AS railway, hstore_get_value(other_tags, 'station') AS station \
+		FROM points WHERE hstore_get_value(other_tags, 'railway') IN ('station','halt')"
+
 # One label line per water body, along its main axis.
 data/water-names.gpkg: data/water-polygons.gpkg scripts/water_centerlines.py
 	$(QGIS_PYTHON) scripts/water_centerlines.py $< $@
@@ -146,9 +160,12 @@ dbobih: sources/dobih.csv
 trigs: sources/trigs.csv
 	$(RENDER) --tileset trigs --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
 
+transport: data/transport.gpkg
+	$(RENDER) --tileset transport --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
+
 tiles: $(TILESETS) waternames
 
-sample: $(DATA_FILES) $(WATERNAMES_JSON)
+sample: $(DATA_FILES) $(WATERNAMES_JSON) data/transport.gpkg
 	for t in $(TILESETS); do \
 		$(RENDER) --tileset $$t --extent=$(SAMPLE_BBOX) --zmin $(SAMPLE_ZMIN) --zmax $(SAMPLE_ZMAX) || exit 1; \
 	done
@@ -160,7 +177,7 @@ sample: $(DATA_FILES) $(WATERNAMES_JSON)
 clean:
 	rm -rf data/tiles data/merged-dem.tif data/hill-shade-merged.tif \
 		data/contours-merged.gpkg data/merged.vrt data/water-polygons.gpkg \
-		data/water-names.gpkg
+		data/water-names.gpkg data/transport.gpkg
 
 # Also removes the downloaded DEM zips and unpacked HGT files.
 distclean: clean

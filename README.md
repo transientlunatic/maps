@@ -17,6 +17,7 @@ Three tile sets are produced, matching the layers in the site's Leaflet map:
 | `topology` | Hypsometric tints, hillshade, contours, OSM water and forest          | `data/tiles/topology/<version>/{z}/{x}/{y}.png` |
 | `dbobih`   | Hill markers, names and heights (transparent)                         | `data/tiles/dbobih/<version>/{z}/{x}/{y}.png`   |
 | `trigs`    | Ordnance Survey trig points (transparent)                             | `data/tiles/trigs/<version>/{z}/{x}/{y}.png`    |
+| `transport` | Railways (bold, with white sleeper dashes) and stations (red markers with names) (transparent) | `data/tiles/transport/<version>/{z}/{x}/{y}.png` |
 | `waternames` | Names of lochs and reservoirs: label lines as GeoJSON (vector), drawn in the browser | `data/tiles/waternames/<version>/water-names.geojson` |
 
 ## Data sources
@@ -27,6 +28,8 @@ Three tile sets are produced, matching the layers in the site's Leaflet map:
   service referenced in the project, so rendering needs internet access.
 - **Hills**: `sources/dobih.csv`, the [Database of British and Irish Hills](https://www.hills-database.co.uk).
 - **Trig points**: `sources/trigs.csv`.
+- **Railways and stations**: `railway=*` ways and `railway=station|halt` nodes from the same
+  Geofabrik extract (`make data/transport.gpkg`).
 - **Water names**: the named water polygons in the OpenStreetMap
   [Geofabrik extract for Scotland](https://download.geofabrik.de/europe/united-kingdom/scotland.html)
   (about 300 MB, downloaded to `data/scotland.osm.pbf`).
@@ -102,6 +105,23 @@ build).
 
 Lochs that are arms of the sea (Loch Fyne, Loch Linnhe and so on) have no water polygon in
 OSM, so they are not labelled by this layer.
+
+## Transport
+
+The `transport` tile set is a prototype of the transport network, with railways and stations
+drawn to stand out against the terrain. It is rendered by QGIS from `data/transport.gpkg`
+(layers `rail_lines` and `rail_stations`, extracted from the OSM file by `make`). Like the
+water names it is not in `basemap.qgz`: `scripts/render_tiles.py` loads the layers and styles
+them with `styling/Rail Lines.qml` and `styling/Rail Stations.qml`.
+
+- Main lines are near-black with a white casing and white sleeper dashes (from zoom 11), so
+  they read over forest and dark hillshade. Sidings, tunnels (dashed), light rail and
+  narrow gauge (purple), trams (magenta) and the Glasgow subway (grey dashes) are
+  distinguished.
+- Stations are red circles with a white halo and a dark outline, sized by zoom, with
+  bold Lato names; halts are smaller and appear from zoom 11.
+
+Roads are not included yet.
 
 ## Editing the styling
 

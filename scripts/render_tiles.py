@@ -40,6 +40,24 @@ TILESETS = {
         "layers": ["Trig Points"],
         "transparent": True,
     },
+    # Railways and stations from OpenStreetMap (`make data/transport.gpkg`).
+    # These layers are not in the QGIS project: they are loaded from data/ and
+    # styled with the QML in styling/, so railways and stations stand out
+    # against the topology. Open both in QGIS to edit the styles.
+    "transport": {
+        "layers": ["Rail Stations", "Rail Lines"],
+        "extra_layers": {
+            "Rail Lines": {
+                "source": "data/transport.gpkg|layername=rail_lines",
+                "style": "styling/Rail Lines.qml",
+            },
+            "Rail Stations": {
+                "source": "data/transport.gpkg|layername=rail_stations",
+                "style": "styling/Rail Stations.qml",
+            },
+        },
+        "transparent": True,
+    },
 }
 
 
@@ -100,6 +118,7 @@ def main():
         QgsProcessingContext,
         QgsProcessingFeedback,
         QgsProject,
+        QgsVectorLayer,
     )
 
     west, south, east, north = (float(v) for v in args.extent.split(","))
@@ -118,6 +137,16 @@ def main():
     project = QgsProject.instance()
     if not project.read(args.project):
         sys.exit(f"Could not read project {args.project}")
+
+    # Layers that are not part of the project: load them with their QML style.
+    for name, extra in spec.get("extra_layers", {}).items():
+        layer = QgsVectorLayer(extra["source"], name, "ogr")
+        if not layer.isValid():
+            sys.exit(f"Could not open {extra['source']} (run `make data/transport.gpkg`)")
+        _, ok = layer.loadNamedStyle(extra["style"])
+        if not ok:
+            sys.exit(f"Could not load style {extra['style']}")
+        project.addMapLayer(layer)
 
     # Switch off everything, then switch on this tile set's layers.
     root = project.layerTreeRoot()
