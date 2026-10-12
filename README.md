@@ -345,6 +345,27 @@ The constants at the top of the script control this; the colour and strength are
 tile set is faded with zoom (`opacity_by_zoom` in `scripts/render_tiles.py`) so that it hazes the
 overview but not close-up detail. Put it above the topology and forests and below everything else.
 
+## Publishing to the tile server
+
+On a release, the `publish` job copies the finished tiles to the tile server
+(tiles.daniel-williams.co.uk, an Apache server on Dreamhost) with rsync over ssh, using
+`scripts/publish_tiles.sh`. It unpacks every shard into one tree and copies it, so
+`{tileset}/{release tag}/...` appears next to the older versions; nothing is deleted. It also
+puts a small `.htaccess` in `waternames/`, which lets the blog fetch the loch names from another
+origin (CORS) and serves the GeoJSON with the right type.
+
+To set it up, add these to the repository (Settings, Secrets and variables, Actions):
+
+| Name | Kind | What |
+|---|---|---|
+| `SSH_KEY` | secret | a private key that can log in to the server (the blog's deploy key works) |
+| `SSH_HOST` | secret | the server's host name |
+| `SSH_USER` | secret | the ssh user |
+| `TILES_PATH` | variable (optional) | the tile server's directory on that host; defaults to `/home/danwilliams/tiles.daniel-williams.co.uk/` |
+
+If a secret is missing the job is skipped with a notice, and the release still builds. The
+same script works by hand: `scripts/publish_tiles.sh <directory of shard archives> user@host:/path/`.
+
 ## Notes
 
 - `HILLSHADE_Z` (vertical exaggeration) was tuned by eye against the live tiles. If
