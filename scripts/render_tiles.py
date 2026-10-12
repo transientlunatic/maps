@@ -30,6 +30,9 @@ TILESETS = {
             "merged-hillshade-315",
             "merged-dem",
         ],
+        # Styles from styling/ that replace the project's own for these layers.
+        # The DEM ramp has extra levels below 200 m (see scripts/lowland_ramp.py).
+        "styles": {"merged-dem": "styling/merged-dem.qml"},
         "transparent": False,
     },
     "dbobih": {
@@ -160,6 +163,11 @@ def main():
     project = QgsProject.instance()
     if not project.read(args.project):
         sys.exit(f"Could not read project {args.project}")
+
+    for name, qml in spec.get("styles", {}).items():
+        _, ok = project.mapLayersByName(name)[0].loadNamedStyle(qml)
+        if not ok:
+            sys.exit(f"Could not load style {qml}")
 
     # Layers that are not part of the project: load them with their QML style.
     for name, extra in spec.get("extra_layers", {}).items():

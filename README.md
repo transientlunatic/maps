@@ -176,6 +176,19 @@ what order (it draws the contours above the forest, which the project itself doe
   `<tileset>-<tag>.tar.gz`.
 - **Manual run**: sample only (version `sample`). Full builds only happen on a release.
 
+## Lowland colours
+
+The DEM colour ramp (`styling/merged-dem.qml`) originally gave everything below 100 m one
+almost white colour, so hills disappeared in flat country such as Glasgow. `scripts/lowland_ramp.py`
+rewrites the levels below 200 m as 15 bands (every 10 m to 100 m, then every 20 m) running from a
+pale sage green at sea level to the beige of the old 100-200 m band. Levels from 200 m up are
+unchanged, so mountains look as before. Change `LOW`, `HIGH` or `BREAKS` in the script and run
+`python3 scripts/lowland_ramp.py` to adjust it.
+
+`scripts/render_tiles.py` applies this QML to the topology tiles. `projects/basemap.qgz` still has
+the old ramp, so load `styling/merged-dem.qml` onto the `merged-dem` layer in QGIS (or run
+`make apply-styles` and save) to see the same colours there.
+
 ## Notes
 
 - `HILLSHADE_Z` (vertical exaggeration) was tuned by eye against the live tiles. If

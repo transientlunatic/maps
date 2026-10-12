@@ -191,8 +191,21 @@
             <prop k="stops" v="0.0133235;244,242,240,255;rgb;ccw:0.166667;237,233,229,255;rgb;ccw:0.25;217,206,194,255;rgb;ccw:0.333333;202,186,170,255;rgb;ccw:0.416667;187,166,145,255;rgb;ccw:0.5;172,147,121,255;rgb;ccw:0.583333;158,127,96,255;rgb;ccw:0.666667;143,107,72,255;rgb;ccw:0.75;128,88,47,255;rgb;ccw:0.833333;114,68,23,255;rgb;ccw:0.916667;112,66,20,255;rgb;ccw"/>
           </colorramp>
           <item color="#f4f2f0" label="&lt;= 0.0000" value="0" alpha="255"/>
-          <item color="#f2efec" label="0.0000 - 100.0000" value="100" alpha="255"/>
-          <item color="#eeebe7" label="100.0000 - 200.0000" value="200" alpha="255"/>
+          <item color="#c9d4b5" label="0.0000 - 10.0000" value="10" alpha="255"/>
+          <item color="#cad5b7" label="10.0000 - 20.0000" value="20" alpha="255"/>
+          <item color="#ccd6b8" label="20.0000 - 30.0000" value="30" alpha="255"/>
+          <item color="#cdd6ba" label="30.0000 - 40.0000" value="40" alpha="255"/>
+          <item color="#cfd7bc" label="40.0000 - 50.0000" value="50" alpha="255"/>
+          <item color="#d1d8bd" label="50.0000 - 60.0000" value="60" alpha="255"/>
+          <item color="#d2d8bf" label="60.0000 - 70.0000" value="70" alpha="255"/>
+          <item color="#d4d9c1" label="70.0000 - 80.0000" value="80" alpha="255"/>
+          <item color="#d5dac2" label="80.0000 - 90.0000" value="90" alpha="255"/>
+          <item color="#d7dac4" label="90.0000 - 100.0000" value="100" alpha="255"/>
+          <item color="#dadbc8" label="100.0000 - 120.0000" value="120" alpha="255"/>
+          <item color="#ddddcb" label="120.0000 - 140.0000" value="140" alpha="255"/>
+          <item color="#e0dece" label="140.0000 - 160.0000" value="160" alpha="255"/>
+          <item color="#e3dfd2" label="160.0000 - 180.0000" value="180" alpha="255"/>
+          <item color="#e7e1d6" label="180.0000 - 200.0000" value="200" alpha="255"/>
           <item color="#e2d9d1" label="200.0000 - 300.0000" value="300" alpha="255"/>
           <item color="#d2c5b8" label="300.0000 - 400.0000" value="400" alpha="255"/>
           <item color="#c6b4a3" label="400.0000 - 500.0000" value="500" alpha="255"/>
