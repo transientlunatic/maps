@@ -140,14 +140,17 @@ zoom 13.
 
 The `paths` tile set (`make data/paths.gpkg`, styled by `styling/Paths.qml`) shows `highway=path`,
 `footway`, `bridleway` and `track` from zoom 12. Pavements and crossings (`footway=sidewalk` or
-`crossing`), ways closed to walkers (`foot=no`) and private ways are left out, and each line has a
-faint white edge so it reads over forest and dark hillshade.
+`crossing`), ways closed to walkers (`foot=no`) and private ways are left out.
 
-- **Tracks** are solid brown-grey lines; better surfaced ones (`tracktype` grade 1 and 2) are darker
-  and heavier, rougher ones are dashed.
-- **Footpaths and bridleways** are red-brown dashes. Difficulty follows `sac_scale`: `mountain_hiking`
-  is darker and bolder, and demanding or alpine paths are dark red dots. Paths whose
-  `trail_visibility` is bad or worse are faint, widely spaced dots.
+The lines are deliberately light and thin: each has a faint dark edge so it still reads on pale
+ground, but the line itself is white or light grey, so it stands out on forest and dark hillshade
+without dominating the map.
+
+- **Tracks** are solid light grey lines; better surfaced ones (`tracktype` grade 1 and 2) are slightly
+  heavier, rougher ones are dashed.
+- **Footpaths and bridleways** are white dashes. Difficulty only changes the dash pattern, following
+  `sac_scale`: `mountain_hiking` has longer dashes, demanding or alpine paths are dots, and paths
+  whose `trail_visibility` is bad or worse are sparse dots.
 
 Where `sac_scale` or `trail_visibility` are not mapped (common in Scotland) a path is drawn as an
 ordinary footpath. Draw it beneath the railways and above the roads.
