@@ -1,143 +1,92 @@
 # Basemap project
 
-This repository builds map tiles for Scotland showing:
-1. **Basemap**: Elevation-based hillshade with forest and water overlays from OpenStreetMap
-2. **Trig Points**: Triangulation points from the Ordnance Survey
-3. **Hills**: Markers for hills from the Database of British and Irish Hills (DoBIH)
+Builds the map tiles for Scotland used at <https://www.daniel-williams.co.uk/map/>.
 
-The tiles are suitable for use with Leaflet and other web mapping libraries.
+The cartography lives in a QGIS project (`projects/basemap.qgz`, with layer styles
+exported to `styling/`). This repository prepares the data the project needs and
+renders it to XYZ PNG tiles with headless QGIS, so the tiles can be regenerated
+without opening QGIS.
+
+Three tile sets are produced, matching the layers in the site's Leaflet map:
+
+| Tile set   | Contents                                                              | Path                                   |
+|------------|-----------------------------------------------------------------------|----------------------------------------|
+| `topology` | Hypsometric tints, hillshade, contours, OSM water and forest          | `data/tiles/topology/v0/{z}/{x}/{y}.png` |
+| `dbobih`   | Hill markers, names and heights (transparent)                         | `data/tiles/dbobih/v0/{z}/{x}/{y}.png`   |
+| `trigs`    | Ordnance Survey trig points (transparent)                             | `data/tiles/trigs/v0/{z}/{x}/{y}.png`    |
 
 ## Data sources
-- **Elevation**: ViewfinderPanoramas SRTM-derived DEMs: http://viewfinderpanoramas.org/dem3
-  - Tiles are downloaded as `.zip` archives (e.g. `N49E000.zip`) and contain `.hgt` files.
-  - Credit: ViewfinderPanoramas (SRTM-derived DEMs).
-- **Trig Points**: `sources/trigs.csv` - UK triangulation point database
-- **Hills**: `sources/dobih.csv` - Database of British and Irish Hills
-- **Forest/Water overlays**: OpenStreetMap data (via Overpass API)
+
+- **Elevation**: [ViewfinderPanoramas](http://viewfinderpanoramas.org/dem3.html) DEM
+  (SRTM-derived), downloaded as 4° × 6° block zips (`N29 N30 O29 O30` cover Scotland).
+- **Water and forest**: OpenStreetMap, read by QGIS from the ArcGIS OSM vector tile
+  service referenced in the project, so rendering needs internet access.
+- **Hills**: `sources/dobih.csv`, the [Database of British and Irish Hills](https://www.hills-database.co.uk).
+- **Trig points**: `sources/trigs.csv`.
 
 ## Prerequisites
-- GNU Make
-- Python 3.x
-- GDAL command-line tools: `gdal_merge.py`, `gdaldem`, `gdal_contour`, `gdal2tiles.py`, `gdal_calc.py`, `gdal_rasterize`
-- `wget` or `curl` and `unzip`
-- `jq` (for JSON processing)
-- Optional: `tippecanoe` for generating vector tiles (https://github.com/felt/tippecanoe)
 
-## Quick Start
-
-### Build all tile sets (sample area for testing)
-
-```bash
-make sample         # Build sample basemap tiles
-make geojson        # Generate GeoJSON from CSV files
-make point-tiles    # Generate point tiles (requires tippecanoe)
-```
-
-### Build specific tile sets
-
-```bash
-# Generate GeoJSON files from CSV data
-make geojson
-
-# Generate basemap tiles (UK)
-make uk
-make data/tiles
-
-# Generate point data tiles
-make point-tiles
-```
+- GNU Make, `curl`, `unzip`
+- GDAL command-line tools (`gdalbuildvrt`, `gdal_translate`, `gdaldem`, `gdal_contour`)
+- QGIS **3.40 or newer** with its Python bindings. The project was saved with QGIS 3.38,
+  and the older QGIS 3.34 in Ubuntu 24.04 renders rasters blocky, so on Ubuntu use the
+  [QGIS LTR repository](https://qgis.org/resources/installation-guide/#debianubuntu).
+  Run `make` with a Python that can `import qgis`, which is the system Python on
+  Debian/Ubuntu (`make QGIS_PYTHON=/usr/bin/python3 ...`).
 
 ## Usage
 
-### Basemap tiles
-
-Edit `mergeInputFiles.txt` to list the HGT tile names you want to include (the Makefile accepts either absolute `/tmp/N49E000.hgt`-style lines or basenames like `N49E000.hgt`).
-
-Download elevation tiles:
 ```bash
-make hgt
+make sample          # Ben Ledi area, zooms 9-12, all three tile sets (~2 minutes)
+make dem             # only the DEM, hillshade and contours
+make topology        # one tile set for all of Scotland (zooms 9-13)
+make tiles           # all three tile sets (slow; see below)
 ```
 
-To override the download base (if you mirror tiles elsewhere):
+Useful variables (all have defaults in the Makefile):
+
 ```bash
-make HGT_BASE_URL=https://my-mirror.example.org/dem3 hgt
+make topology TILE_BBOX=-5,56,-4,57 TILE_ZMIN=9 TILE_ZMAX=12   # west,south,east,north
+make dem HILLSHADE_Z=3 CONTOUR_INTERVAL=25
+make sample QGIS_PYTHON=/usr/bin/python3
 ```
 
-Build the merged DEM and derived products:
+To look at the result, serve the tiles and point Leaflet at them:
+
 ```bash
-make                # builds data/merged-dem.tif
-make data/tiles     # generates tiled output in data/tiles
+python3 -m http.server -d data/tiles 8000
+# L.tileLayer('http://localhost:8000/topology/v0/{z}/{x}/{y}.png')
 ```
 
-### Point data tiles
+### How long does it take?
 
-The repository includes two point datasets that are automatically converted to GeoJSON:
+The topology tiles are slow to render, because QGIS fetches the OSM vector tiles
+and renders every tile. Scotland at zoom 13 is roughly 40,000 tiles per tile set, so
+a full build is a many-hour job. The release workflow builds each tile set in its own
+job to stay inside GitHub's per-job limit.
 
-1. **Trig Points** (`sources/trigs.csv` → `data/points/trig-points.geojson`)
-2. **Hills** (`sources/dobih.csv` → `data/points/hills.geojson`)
+## Editing the styling
 
-Generate GeoJSON files:
+Layer styles are stored as `.qml` files in `styling/` so they can be diffed.
+
 ```bash
-make geojson
+make export-styles          # project -> styling/
+make apply-styles           # styling/ -> project
 ```
 
-If you have `tippecanoe` installed, generate vector tiles:
-```bash
-make point-tiles
-```
-
-This creates:
-- `data/tiles/trig-points.mbtiles`
-- `data/tiles/hills.mbtiles`
-
-Without tippecanoe, the GeoJSON files can be used directly with Leaflet or other web mapping libraries.
-
-## Area options
-
-By default the Makefile builds the `uk` area. You can also build a much smaller sample area for quick testing.
-
-Build the default UK basemap (uses `mergeInputFiles.txt`):
-```bash
-make uk
-```
-
-Build the small sample basemap (uses `mergeInputFiles-sample.txt`):
-```bash
-make sample
-```
-
-To download the HGT tiles for the currently-selected `AREA`:
-```bash
-make hgt
-```
+`scripts/render_tiles.py` chooses which project layers each tile set draws, and in
+what order (it draws the contours above the forest, which the project itself does not).
 
 ## GitHub Actions
 
-The repository includes a GitHub Actions workflow that automatically builds tiles:
+`.github/workflows/build-tiles.yml` builds on:
 
-- **On push**: Builds a small sample tile set for testing
-- **On release**: Builds the full Scotland tile set and attaches it to the release
-- **Manual trigger**: Can be triggered manually via workflow_dispatch to build either sample or full tiles
-
-The workflow generates all three tile sets (basemap, trig points, and hills) and uploads them as artifacts.
-
-## Output structure
-
-```
-data/
-├── tiles/
-│   ├── sample/          # Sample basemap tiles (single zoom level)
-│   ├── full/            # Full UK basemap tiles (zoom 0-13)
-│   ├── trig-points.mbtiles   # Trig points vector tiles
-│   └── hills.mbtiles          # Hills vector tiles
-├── points/
-│   ├── trig-points.geojson    # Trig points GeoJSON
-│   └── hills.geojson          # Hills GeoJSON
-└── [intermediate files]
-```
+- **Push to main**: sample tiles for each tile set.
+- **Release**: full tile sets, attached to the release as `<tileset>-full.tar.gz`.
+- **Manual run**: sample or full.
 
 ## Notes
-- The Makefile will download zip archives from the base URL and unzip the contained `.hgt` file into `data/hgt`.
-- If tiles are already present in `data/hgt`, `make` will use them and not re-download.
-- Point data GeoJSON files are large (18MB for trig points, 59MB for hills). Consider using vector tiles (MBTiles) for better performance.
-- The basemap overlay blending uses colors extracted from QGIS QML style files in `styling/`.
+
+- `HILLSHADE_Z` (vertical exaggeration) was tuned by eye against the live tiles. If
+  the shading differs from the site, adjust it and rebuild with `make dem`.
+- The DEM covers 54°N to 60°N. Shetland north of 60°N is not included.
