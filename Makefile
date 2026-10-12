@@ -5,9 +5,9 @@
 # prepares the data files that the project expects in data/ and then calls
 # scripts/render_tiles.py to produce one XYZ PNG tile tree per tile set:
 #
-#   data/tiles/topology/v0/{z}/{x}/{y}.png   terrain, contours, water, forest
-#   data/tiles/dbobih/v0/{z}/{x}/{y}.png     hill markers and names
-#   data/tiles/trigs/v0/{z}/{x}/{y}.png      trig points
+#   data/tiles/topology/<version>/{z}/{x}/{y}.png   terrain, contours, water, forest
+#   data/tiles/dbobih/<version>/{z}/{x}/{y}.png     hill markers and names
+#   data/tiles/trigs/<version>/{z}/{x}/{y}.png      trig points
 #
 # Quick start:   make sample     (one small area, a few zoom levels)
 #                make tiles      (all of Scotland, zooms 9-13; slow)
@@ -35,7 +35,8 @@ SAMPLE_BBOX ?= -4.5,56.2,-4.2,56.35
 SAMPLE_ZMIN ?= 9
 SAMPLE_ZMAX ?= 12
 
-TILE_VERSION ?= v0
+# Version directory in the tile URLs; releases set this to the release tag
+TILE_VERSION ?= dev
 TILE_DIR     ?= data/tiles
 TILESETS     := topology dbobih trigs
 

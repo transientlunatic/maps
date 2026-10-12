@@ -11,17 +11,8 @@ on:
   release:
     types: [published]
 
-  # Manual run, choosing the sample or the full tile set
+  # Manual run (always the sample; full builds only happen on a release)
   workflow_dispatch:
-    inputs:
-      tile_set:
-        description: 'Which tile set to build'
-        required: true
-        default: 'sample'
-        type: choice
-        options:
-          - sample
-          - full
 
 jobs:
   build-tiles:
@@ -36,7 +27,10 @@ jobs:
         tileset: [topology, dbobih, trigs]
 
     env:
-      MODE: ${{ (github.event_name == 'release' || inputs.tile_set == 'full') && 'full' || 'sample' }}
+      # Full builds only happen on a release, and the release tag becomes the
+      # version directory in the tile URLs: {tileset}/{tag}/{z}/{x}/{y}.png
+      MODE: ${{ github.event_name == 'release' && 'full' || 'sample' }}
+      TILE_VERSION: ${{ github.event_name == 'release' && github.event.release.tag_name || 'sample' }}
 
     steps:
       - name: Checkout repository
@@ -60,7 +54,7 @@ jobs:
             'Signed-By: /etc/apt/keyrings/qgis-archive-keyring.gpg' \
             | sudo tee /etc/apt/sources.list.d/qgis.sources
           sudo apt-get update
-          sudo apt-get install -y qgis python3-qgis qgis-providers gdal-bin curl unzip
+          sudo apt-get install -y qgis python3-qgis qgis-providers gdal-bin fonts-lato fonts-inter curl unzip
 
       # Only the topology tiles need the elevation data
       - name: Build DEM, hillshade and contours
@@ -69,28 +63,28 @@ jobs:
 
       - name: Build sample tiles
         if: env.MODE == 'sample'
-        run: make QGIS_PYTHON=/usr/bin/python3 ${{ matrix.tileset }} TILE_BBOX=-4.5,56.2,-4.2,56.35 TILE_ZMAX=12
+        run: make QGIS_PYTHON=/usr/bin/python3 TILE_VERSION=${{ env.TILE_VERSION }} ${{ matrix.tileset }} TILE_BBOX=-4.5,56.2,-4.2,56.35 TILE_ZMAX=12
         timeout-minutes: 60
 
       - name: Build full tiles
         if: env.MODE == 'full'
-        run: make QGIS_PYTHON=/usr/bin/python3 ${{ matrix.tileset }}
+        run: make QGIS_PYTHON=/usr/bin/python3 TILE_VERSION=${{ env.TILE_VERSION }} ${{ matrix.tileset }}
         timeout-minutes: 360
 
       - name: Package tiles
         run: |
-          tar -C data/tiles -czf ${{ matrix.tileset }}-${{ env.MODE }}.tar.gz ${{ matrix.tileset }}
-          du -sh ${{ matrix.tileset }}-${{ env.MODE }}.tar.gz data/tiles/${{ matrix.tileset }}
+          tar -C data/tiles -czf ${{ matrix.tileset }}-${{ env.TILE_VERSION }}.tar.gz ${{ matrix.tileset }}
+          du -sh ${{ matrix.tileset }}-${{ env.TILE_VERSION }}.tar.gz data/tiles/${{ matrix.tileset }}
 
       - name: Upload tiles as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.tileset }}-${{ env.MODE }}
-          path: ${{ matrix.tileset }}-${{ env.MODE }}.tar.gz
+          name: ${{ matrix.tileset }}-${{ env.TILE_VERSION }}
+          path: ${{ matrix.tileset }}-${{ env.TILE_VERSION }}.tar.gz
           retention-days: ${{ env.MODE == 'full' && 90 || 30 }}
 
       - name: Upload release assets
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ matrix.tileset }}-full.tar.gz
+          files: ${{ matrix.tileset }}-${{ env.TILE_VERSION }}.tar.gz

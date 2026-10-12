@@ -43,15 +43,44 @@ TILESETS = {
 }
 
 
+# Label fields that hold a feature's name (the other labels show heights etc.)
+NAME_FIELDS = {"Name", "tp_name", "string_to_array(\"Name\", ' [', '')[0]"}
+
+
+def set_name_font(layer, family):
+    """Switch the font of the layer's name labels to `family`."""
+    from qgis.core import QgsRuleBasedLabeling
+
+    labeling = layer.labeling()
+    if not isinstance(labeling, QgsRuleBasedLabeling):
+        return
+    for rule in labeling.rootRule().descendants():
+        settings = rule.settings()
+        if settings is None or settings.fieldName not in NAME_FIELDS:
+            continue
+        settings = type(settings)(settings)
+        fmt = settings.format()
+        font = fmt.font()
+        font.setFamily(family)
+        fmt.setFont(font)
+        fmt.setNamedStyle("Regular")
+        settings.setFormat(fmt)
+        rule.setSettings(settings)
+
+
 def parse_args():
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("--project", required=True, help="QGIS project (.qgz/.qgs)")
     p.add_argument("--tileset", required=True, choices=sorted(TILESETS))
     p.add_argument("--out", default="data/tiles", help="output root directory")
-    p.add_argument("--version", default="v0", help="version directory name")
+    p.add_argument("--version", default="dev", help="version directory name")
     p.add_argument(
         "--extent", required=True,
         help="west,south,east,north in degrees (EPSG:4326)",
+    )
+    p.add_argument(
+        "--name-font", default="Lato",
+        help="font family for hill and trig point names ('' keeps the project's)",
     )
     p.add_argument("--zmin", type=int, default=9)
     p.add_argument("--zmax", type=int, default=13)
@@ -100,6 +129,8 @@ def main():
         if not layers:
             sys.exit(f"Layer {name!r} not found in {args.project}")
         ordered.append(layers[0])
+        if args.name_font:
+            set_name_font(layers[0], args.name_font)
         node = root.findLayer(layers[0].id())
         # Parent groups must be on too, or the layer will not draw.
         node.setItemVisibilityCheckedParentRecursive(True)
