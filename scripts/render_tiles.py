@@ -163,6 +163,19 @@ TILESETS = {
         },
         "transparent": True,
     },
+    # BGS 1:50k bedrock geology (`make data/geology.tif`), muted and half transparent, styled
+    # with styling/Geology.qml. Blend it with `mix-blend-mode: multiply` like the forests.
+    "geology": {
+        "layers": ["Geology"],
+        "extra_layers": {
+            "Geology": {
+                "type": "raster",
+                "source": "data/geology.tif",
+                "style": "styling/Geology.qml",
+            },
+        },
+        "transparent": True,
+    },
     # Crags, scree and bare rock (`make data/crags.gpkg`), styled with styling/Cliffs.qml and
     # styling/Rock.qml.
     "crags": {

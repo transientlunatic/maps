@@ -93,13 +93,21 @@ jobs:
           path: data/scotland.osm.pbf
           key: osm-scotland-${{ steps.month.outputs.month }}
 
+      # The geology comes from the BGS web map service and takes a few minutes to fetch,
+      # but it hardly ever changes, so keep it. Change the key to fetch it again.
+      - name: Cache the geology
+        uses: actions/cache@v4
+        with:
+          path: data/geology.tif
+          key: geology-v1
+
       - name: Build the elevation data
         run: make dem
 
       - name: Build the OSM data
         run: |
           make data/transport.gpkg data/roads.gpkg data/shelters.gpkg data/paths.gpkg \
-            data/rivers.gpkg data/facilities.gpkg data/crags.gpkg
+            data/rivers.gpkg data/facilities.gpkg data/crags.gpkg data/geology.tif
 
       # The loch names are vector data, so they are finished here rather than rendered
       - name: Build the loch names
@@ -134,6 +142,7 @@ jobs:
             data/rivers.gpkg
             data/facilities.gpkg
             data/crags.gpkg
+            data/geology.tif
           retention-days: 1
           compression-level: 1
 

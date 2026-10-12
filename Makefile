@@ -51,7 +51,7 @@ SAMPLE_ZMAX ?= 12
 TILE_VERSION ?= dev
 TILE_DIR     ?= data/tiles
 # Raster tile sets rendered by QGIS; the water names are vector data (below)
-TILESETS     := topology imhof forests mist elevmist dbobih trigs transport roads shelters paths rivers facilities crags
+TILESETS     := topology imhof forests mist elevmist dbobih trigs transport roads shelters paths rivers facilities crags geology
 
 PROJECT ?= projects/basemap.qgz
 
@@ -219,6 +219,11 @@ data/crags.gpkg: data/scotland.osm.pbf scripts/osmconf.ini
 		CASE WHEN \"natural\" = 'scree' THEN 'scree' ELSE 'bare_rock' END AS kind FROM multipolygons \
 		WHERE \"natural\" IN ('scree','bare_rock','rock')"
 
+# BGS 1:50k bedrock geology for the tile area, from the BGS web map service (see
+# scripts/fetch_geology.py). It changes rarely, so it is not rebuilt unless it is missing.
+data/geology.tif:
+	$(QGIS_PYTHON) scripts/fetch_geology.py --bbox=$(TILE_BBOX) $@
+
 # Bothies (tourism=wilderness_hut, bothy=yes) and shelters (amenity=shelter, leaving
 # out bus shelters and picnic shelters), as points: mapped buildings are reduced to
 # a point inside them. Uses scripts/osmconf.ini so the tags are real columns.
@@ -305,6 +310,9 @@ shelters: data/shelters.gpkg
 
 crags: data/crags.gpkg
 	$(RENDER) --tileset crags --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
+
+geology: data/geology.tif
+	$(RENDER) --tileset geology --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
 
 paths: data/paths.gpkg
 	$(RENDER) --tileset paths --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
