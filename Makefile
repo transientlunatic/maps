@@ -7,6 +7,7 @@
 #
 #   data/tiles/topology/<version>/{z}/{x}/{y}.png   terrain, contours and water
 #   data/tiles/forests/<version>/{z}/{x}/{y}.png    forest (use mix-blend-mode: multiply)
+#   data/tiles/mist/<version>/{z}/{x}/{y}.png       valley mist (a pale haze, zoomed out)
 #   data/tiles/dbobih/<version>/{z}/{x}/{y}.png     hill markers and names
 #   data/tiles/trigs/<version>/{z}/{x}/{y}.png      trig points
 #   data/tiles/transport/<version>/{z}/{x}/{y}.png  railways and stations
@@ -48,7 +49,7 @@ SAMPLE_ZMAX ?= 12
 TILE_VERSION ?= dev
 TILE_DIR     ?= data/tiles
 # Raster tile sets rendered by QGIS; the water names are vector data (below)
-TILESETS     := topology forests dbobih trigs transport roads shelters paths rivers facilities
+TILESETS     := topology forests mist dbobih trigs transport roads shelters paths rivers facilities
 
 PROJECT ?= projects/basemap.qgz
 
@@ -217,16 +218,27 @@ $(WATERNAMES_JSON): data/water-names.gpkg
 
 waternames: $(WATERNAMES_JSON)
 
-dem: data/merged-dem.tif data/hill-shade-merged.tif data/contours-merged.gpkg
+# Sea polygons with a detailed coastline, from the DEM (see scripts/make_sea.py)
+data/sea.gpkg: data/merged-dem.tif scripts/make_sea.py
+	$(QGIS_PYTHON) scripts/make_sea.py $< $@
+
+# Valley mist density, from the DEM (see scripts/make_mist.py)
+data/mist.tif: data/merged-dem.tif scripts/make_mist.py
+	$(QGIS_PYTHON) scripts/make_mist.py $< $@
+
+dem: data/merged-dem.tif data/hill-shade-merged.tif data/contours-merged.gpkg data/mist.tif data/sea.gpkg
 
 # ---------------------------------------------------------------------------
 # Tiles (rendered by QGIS)
 # ---------------------------------------------------------------------------
 
-DATA_FILES := data/merged-dem.tif data/hill-shade-merged.tif data/contours-merged.gpkg
+DATA_FILES := data/merged-dem.tif data/hill-shade-merged.tif data/contours-merged.gpkg data/sea.gpkg
 
 topology: $(DATA_FILES)
 	$(RENDER) --tileset topology --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
+
+mist: data/mist.tif
+	$(RENDER) --tileset mist --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
 
 forests:
 	$(RENDER) --tileset forests --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
@@ -282,7 +294,7 @@ samples:
 
 clean:
 	rm -rf data/tiles data/merged-dem.tif data/hill-shade-merged.tif \
-		data/contours-merged.gpkg data/merged.vrt data/water-polygons.gpkg \
+		data/contours-merged.gpkg data/merged.vrt data/mist.tif data/sea.gpkg data/water-polygons.gpkg \
 		data/water-names.gpkg data/transport.gpkg data/roads.gpkg data/shelters.gpkg data/paths.gpkg data/rivers.gpkg data/facilities.gpkg
 
 # Also removes the downloaded DEM zips and unpacked HGT files.

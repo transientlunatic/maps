@@ -25,19 +25,45 @@ TILESETS = {
     "topology": {
         "layers": [
             "Contours",
+            "Sea",
             "OSM - Water",
             "merged-hillshade-315",
             "merged-dem",
         ],
+        "extra_layers": {
+            "Sea": {
+                "source": "data/sea.gpkg|layername=sea",
+                "style": "styling/Sea.qml",
+            },
+        },
         # Styles from styling/ that replace the project's own for these layers.
         # The DEM ramp has extra levels below 200 m (see scripts/lowland_ramp.py).
         "styles": {"merged-dem": "styling/merged-dem.qml"},
+        # Sharp coastlines: the project's sea is a coarse polygon that its style blurs. The
+        # "Sea" layer (from the DEM, `make data/sea.gpkg`) replaces it. (The forest keeps
+        # its soft edge.)
+        "replace_sea": "OSM - Water",
         "transparent": False,
     },
     # Forest, drawn from the project's "OSM - Forestry" layer as a transparent overlay so
     # that it can be switched off. Put it above the topology.
     "forests": {
         "layers": ["OSM - Forestry"],
+        "transparent": True,
+    },
+    # Valley mist from data/mist.tif (`make data/mist.tif`), after Eduard Imhof's aerial
+    # perspective: a pale blue haze that collects on valley floors in rugged country. It is
+    # strongest zoomed out and fades as you zoom in, so it never washes out close-up detail.
+    "mist": {
+        "layers": ["Valley Mist"],
+        "extra_layers": {
+            "Valley Mist": {
+                "type": "raster",
+                "source": "data/mist.tif",
+                "style": "styling/Valley Mist.qml",
+            },
+        },
+        "opacity_by_zoom": {9: 1.0, 10: 1.0, 11: 0.85, 12: 0.55, 13: 0.3},
         "transparent": True,
     },
     "dbobih": {
@@ -160,6 +186,25 @@ def set_name_font(layer, family):
         rule.setSettings(settings)
 
 
+def drop_project_sea(layer):
+    """Switch off the sea polygons of a vector tile layer styled like "OSM - Water".
+
+    The project draws a coarse, generalised sea and blurs it; the topology tiles draw a sharper
+    sea from the DEM instead (the "Sea" layer), so both of the project's sea styles go. Its beach
+    polygons follow the same coarse coast, so they would show as a stripe beside the new, more
+    accurate coastline and go too.
+    """
+    from qgis.core import QgsVectorTileBasicRenderer
+
+    styles = layer.renderer().styles()
+    for style in styles:
+        if style.styleName() in ("ocean (small scale)", "ocean (large scale)") or style.layerName() == "beach":
+            style.setEnabled(False)
+    renderer = QgsVectorTileBasicRenderer()
+    renderer.setStyles(styles)
+    layer.setRenderer(renderer)
+
+
 def parse_args():
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("--project", required=True, help="QGIS project (.qgz/.qgs)")
@@ -192,6 +237,7 @@ def main():
         QgsProcessingContext,
         QgsProcessingFeedback,
         QgsProject,
+        QgsRasterLayer,
         QgsVectorLayer,
     )
 
@@ -212,6 +258,9 @@ def main():
     if not project.read(args.project):
         sys.exit(f"Could not read project {args.project}")
 
+    if spec.get("replace_sea"):
+        drop_project_sea(project.mapLayersByName(spec["replace_sea"])[0])
+
     for name, qml in spec.get("styles", {}).items():
         _, ok = project.mapLayersByName(name)[0].loadNamedStyle(qml)
         if not ok:
@@ -219,7 +268,10 @@ def main():
 
     # Layers that are not part of the project: load them with their QML style.
     for name, extra in spec.get("extra_layers", {}).items():
-        layer = QgsVectorLayer(extra["source"], name, "ogr")
+        if extra.get("type") == "raster":
+            layer = QgsRasterLayer(extra["source"], name, "gdal")
+        else:
+            layer = QgsVectorLayer(extra["source"], name, "ogr")
         if not layer.isValid():
             sys.exit(f"Could not open {extra['source']} (run `make data/transport.gpkg`)")
         _, ok = layer.loadNamedStyle(extra["style"])
@@ -256,6 +308,11 @@ def main():
     background = QColor(0, 0, 0, 0) if spec["transparent"] else QColor(255, 255, 255, 255)
     for z in range(args.zmin, args.zmax + 1):
         print(f"[{args.tileset}] zoom {z}", flush=True)
+        # Some tile sets fade with zoom: set the opacity of their layers for this zoom
+        fade = spec.get("opacity_by_zoom")
+        if fade:
+            for layer in ordered:
+                layer.setOpacity(fade.get(z, 1.0))
         processing.run(
             "native:tilesxyzdirectory",
             {

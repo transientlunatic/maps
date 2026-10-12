@@ -27,6 +27,7 @@ MULTIPLY = {"forests"}
 SAMPLES = {
     "topology": (-4.55, 56.10, 11, ["topology"]),
     "forests": (-4.42, 56.35, 12, ["topology", "forests"]),
+    "mist": (-4.80, 56.55, 10, ["topology", "mist"]),
     "dbobih": (-4.63, 56.19, 12, ["topology", "forests", "dbobih"]),
     "trigs": (-4.32, 56.25, 12, ["topology", "forests", "trigs"]),
     "roads": (-4.31, 55.865, 12, ["topology", "forests", "roads"]),
@@ -39,8 +40,9 @@ SAMPLES = {
 
 # Data each tile set needs (the topology needs the DEM files)
 NEEDS = {
-    "topology": ["data/merged-dem.tif", "data/hill-shade-merged.tif", "data/contours-merged.gpkg"],
+    "topology": ["data/merged-dem.tif", "data/hill-shade-merged.tif", "data/contours-merged.gpkg", "data/sea.gpkg"],
     "forests": [],
+    "mist": ["data/mist.tif"],
     "dbobih": ["sources/dobih.csv"],
     "trigs": ["sources/trigs.csv"],
     "roads": ["data/roads.gpkg"],
