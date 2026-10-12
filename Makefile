@@ -258,6 +258,16 @@ sample: $(DATA_FILES) $(WATERNAMES_JSON) data/transport.gpkg data/roads.gpkg dat
 		$(RENDER) --tileset $$t --extent=$(SAMPLE_BBOX) --zmin $(SAMPLE_ZMIN) --zmax $(SAMPLE_ZMAX) || exit 1; \
 	done
 
+# Render one tile set without (re)building its data, for sharded builds: the data files are
+# made once, then each job renders a slice of the area, e.g.
+#   make render-roads TILE_BBOX=-9.1,55.7,-4.2,57.3
+render-%:
+	$(RENDER) --tileset $* --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
+
+# Print a Makefile variable, e.g. `make -s print-TILE_BBOX` (used by the workflow)
+print-%:
+	@echo $($*)
+
 # Sample images for the README (docs/samples), from the data in data/
 samples:
 	QT_QPA_PLATFORM=offscreen $(QGIS_PYTHON) scripts/make_samples.py

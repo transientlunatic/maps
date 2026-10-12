@@ -240,11 +240,30 @@ what order (it draws the contours above the forest, which the project itself doe
 
 `.github/workflows/build-tiles.yml` builds on:
 
-- **Push to main**: sample tiles for each tile set.
+- **Push to main**: sample tiles for each tile set (the small `SAMPLE_BBOX` area, zooms 9-12).
 - **Release**: full tile sets. The release tag is the version in the tile URLs
-  (`{tileset}/{tag}/{z}/{x}/{y}.png`), and each tile set is attached to the release as
-  `<tileset>-<tag>.tar.gz`.
+  (`{tileset}/{tag}/{z}/{x}/{y}.png`).
 - **Manual run**: sample only (version `sample`). Full builds only happen on a release.
+
+The build runs in stages so that rendering, the slow part, is spread over many jobs:
+
+1. **plan** works out the version, the area and the list of jobs.
+2. **data** builds the data files once: the DEM, hillshade and contours, the OSM extracts for the
+   roads, railways, paths, rivers, shelters and facilities, and the loch names (which are vector
+   data, so they are finished here). It shares them with the next stage as an artifact.
+3. **tiles** renders every tile set for one *shard* per job, using `make render-<tileset>`.
+4. **release** (releases only) attaches all the shards to the release.
+
+A full build is cut into 2 columns × 4 rows of shards, so 9 tile sets × 8 shards = 72 render jobs
+that run in parallel. Change the grid with the repository variables `SHARD_COLS` and
+`SHARD_ROWS` (Settings → Secrets and variables → Actions → Variables); more shards means shorter
+jobs but more overhead, as each job installs QGIS. Shards follow zoom 9 tile edges
+(`scripts/shards.py`), so the tiles of every zoom fall in exactly one shard and nothing overlaps.
+
+Each shard becomes a release asset called `<tileset>-<tag>-<shard>.tar.gz`, and the loch names are
+`waternames-<tag>.tar.gz`. Every archive holds `<tileset>/<tag>/...`, so unpack them all into the
+same directory to get the tile tree. Splitting the assets this way also keeps each under GitHub's
+2 GB limit per file.
 
 ## Lowland colours
 

@@ -14,24 +14,62 @@ on:
   # Manual run (always the sample; full builds only happen on a release)
   workflow_dispatch:
 
+# The build runs in four stages so that the slow part, rendering tiles, can be spread
+# over many jobs:
+#   plan     work out the version, area and the list of jobs (tile set x shard)
+#   data     build the data files once (DEM, hillshade, contours, OSM extracts, loch names)
+#   tiles    render every tile set for one shard (a slice of the area) per job
+#   release  attach all the shards to the release (releases only)
+# A full build is cut into SHARD_COLS x SHARD_ROWS shards (repository variables, 2 x 4 by
+# default). Shards follow zoom 9 tile edges, so their tiles never overlap.
 jobs:
-  build-tiles:
+  plan:
     runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.plan.outputs.mode }}
+      version: ${{ steps.plan.outputs.version }}
+      zmax: ${{ steps.plan.outputs.zmax }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    permissions:
-      contents: write  # Needed to upload release assets
+      - name: Plan the build
+        id: plan
+        env:
+          SHARD_COLS: ${{ vars.SHARD_COLS || 2 }}
+          SHARD_ROWS: ${{ vars.SHARD_ROWS || 4 }}
+          EVENT: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          tilesets=$(make -s print-TILESETS | tr ' ' ',')
+          if [ "$EVENT" = "release" ]; then
+            # The release tag becomes the version directory in the tile URLs:
+            # {tileset}/{tag}/{z}/{x}/{y}.png
+            mode=full
+            version="$RELEASE_TAG"
+            zmax=$(make -s print-TILE_ZMAX)
+            matrix=$(python3 scripts/shards.py --bbox="$(make -s print-TILE_BBOX)" \
+              --cols "$SHARD_COLS" --rows "$SHARD_ROWS" --tilesets "$tilesets")
+          else
+            mode=sample
+            version=sample
+            zmax=$(make -s print-SAMPLE_ZMAX)
+            matrix=$(python3 scripts/shards.py --bbox="$(make -s print-SAMPLE_BBOX)" \
+              --cols 1 --rows 1 --tilesets "$tilesets")
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "zmax=$zmax" >> "$GITHUB_OUTPUT"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "$mode build, version $version, $(echo "$matrix" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["include"]))') tile jobs"
 
-    strategy:
-      fail-fast: false
-      matrix:
-        tileset: [topology, dbobih, trigs, transport, roads, shelters, paths, rivers, facilities, waternames]
-
+  data:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
     env:
-      # Full builds only happen on a release, and the release tag becomes the
-      # version directory in the tile URLs: {tileset}/{tag}/{z}/{x}/{y}.png
-      MODE: ${{ github.event_name == 'release' && 'full' || 'sample' }}
-      TILE_VERSION: ${{ github.event_name == 'release' && github.event.release.tag_name || 'sample' }}
-
+      TILE_VERSION: ${{ needs.plan.outputs.version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -42,9 +80,76 @@ jobs:
         id: month
         run: echo "month=$(date +%Y-%m)" >> "$GITHUB_OUTPUT"
 
+      - name: Install GDAL and Python packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gdal-bin python3-gdal python3-shapely python3-scipy python3-numpy curl unzip
+
+      # The OSM extract changes slowly, so reuse it for a month
+      - name: Cache OSM extract
+        uses: actions/cache@v4
+        with:
+          path: data/scotland.osm.pbf
+          key: osm-scotland-${{ steps.month.outputs.month }}
+
+      - name: Build the elevation data
+        run: make dem
+
+      - name: Build the OSM data
+        run: |
+          make data/transport.gpkg data/roads.gpkg data/shelters.gpkg data/paths.gpkg \
+            data/rivers.gpkg data/facilities.gpkg
+
+      # The loch names are vector data, so they are finished here rather than rendered
+      - name: Build the loch names
+        run: |
+          make waternames
+          tar -C data/tiles -czf waternames-${{ env.TILE_VERSION }}.tar.gz waternames
+          mkdir -p assets && mv waternames-${{ env.TILE_VERSION }}.tar.gz assets/
+
+      - name: Upload the loch names
+        uses: actions/upload-artifact@v4
+        with:
+          name: tiles-waternames
+          path: assets/*.tar.gz
+          retention-days: ${{ needs.plan.outputs.mode == 'full' && 90 || 30 }}
+
+      # Every tile job needs these, so pass them on as one artifact
+      - name: Upload the data files
+        uses: actions/upload-artifact@v4
+        with:
+          name: data
+          path: |
+            data/merged-dem.tif
+            data/hill-shade-merged.tif
+            data/contours-merged.gpkg
+            data/transport.gpkg
+            data/roads.gpkg
+            data/shelters.gpkg
+            data/paths.gpkg
+            data/rivers.gpkg
+            data/facilities.gpkg
+          retention-days: 1
+          compression-level: 1
+
+  tiles:
+    needs: [plan, data]
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      TILE_VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
       # The project was saved with a recent QGIS and the Ubuntu package is
       # too old to render it faithfully, so use the QGIS LTR repository.
-      - name: Install QGIS and GDAL
+      - name: Install QGIS
         run: |
           sudo mkdir -p /etc/apt/keyrings
           sudo curl -sSfL -o /etc/apt/keyrings/qgis-archive-keyring.gpg \
@@ -58,45 +163,53 @@ jobs:
             'Signed-By: /etc/apt/keyrings/qgis-archive-keyring.gpg' \
             | sudo tee /etc/apt/sources.list.d/qgis.sources
           sudo apt-get update
-          sudo apt-get install -y qgis python3-qgis qgis-providers gdal-bin python3-gdal python3-shapely python3-scipy python3-numpy fonts-lato fonts-inter curl unzip
+          sudo apt-get install -y qgis python3-qgis qgis-providers fonts-lato fonts-inter
 
-      # The OSM extract changes slowly, so reuse it for a month
-      - name: Cache OSM extract
-        if: matrix.tileset == 'waternames' || matrix.tileset == 'transport' || matrix.tileset == 'roads' || matrix.tileset == 'shelters' || matrix.tileset == 'paths' || matrix.tileset == 'rivers' || matrix.tileset == 'facilities'
-        uses: actions/cache@v4
+      - name: Download the data files
+        uses: actions/download-artifact@v4
         with:
-          path: data/scotland.osm.pbf
-          key: osm-scotland-${{ steps.month.outputs.month }}
+          name: data
+          path: data
 
-      # Only the topology tiles need the elevation data
-      - name: Build DEM, hillshade and contours
-        if: matrix.tileset == 'topology'
-        run: make dem
-
-      - name: Build sample tiles
-        if: env.MODE == 'sample'
-        run: make QGIS_PYTHON=/usr/bin/python3 TILE_VERSION=${{ env.TILE_VERSION }} ${{ matrix.tileset }} TILE_BBOX=-4.5,56.2,-4.2,56.35 TILE_ZMAX=12
-        timeout-minutes: 60
-
-      - name: Build full tiles
-        if: env.MODE == 'full'
-        run: make QGIS_PYTHON=/usr/bin/python3 TILE_VERSION=${{ env.TILE_VERSION }} ${{ matrix.tileset }}
-        timeout-minutes: 360
-
-      - name: Package tiles
+      - name: Render ${{ matrix.tileset }} (${{ matrix.shard }})
         run: |
-          tar -C data/tiles -czf ${{ matrix.tileset }}-${{ env.TILE_VERSION }}.tar.gz ${{ matrix.tileset }}
-          du -sh ${{ matrix.tileset }}-${{ env.TILE_VERSION }}.tar.gz data/tiles/${{ matrix.tileset }}
+          make render-${{ matrix.tileset }} QGIS_PYTHON=/usr/bin/python3 \
+            TILE_VERSION="$TILE_VERSION" TILE_BBOX="${{ matrix.bbox }}" \
+            TILE_ZMAX=${{ needs.plan.outputs.zmax }}
 
-      - name: Upload tiles as artifact
+      - name: Package the tiles
+        run: |
+          mkdir -p assets
+          tar -C data/tiles -czf "assets/${{ matrix.tileset }}-$TILE_VERSION-${{ matrix.shard }}.tar.gz" ${{ matrix.tileset }}
+          du -sh data/tiles/${{ matrix.tileset }} assets/*.tar.gz
+
+      - name: Upload the tiles
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.tileset }}-${{ env.TILE_VERSION }}
-          path: ${{ matrix.tileset }}-${{ env.TILE_VERSION }}.tar.gz
-          retention-days: ${{ env.MODE == 'full' && 90 || 30 }}
+          name: tiles-${{ matrix.tileset }}-${{ matrix.shard }}
+          path: assets/*.tar.gz
+          retention-days: ${{ needs.plan.outputs.mode == 'full' && 90 || 30 }}
+
+  release:
+    if: github.event_name == 'release'
+    needs: [plan, tiles, data]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Needed to upload release assets
+    steps:
+      # Each shard is a tar.gz named <tileset>-<version>-<shard>.tar.gz. Unpack them all
+      # into the same directory to get the full tile tree.
+      - name: Download all the tile shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tiles-*
+          path: assets
+          merge-multiple: true
+
+      - name: List the release assets
+        run: ls -lh assets
 
       - name: Upload release assets
-        if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ matrix.tileset }}-${{ env.TILE_VERSION }}.tar.gz
+          files: assets/*.tar.gz
