@@ -67,7 +67,7 @@ HILLSHADE_Z     ?= 4
 RENDER = QT_QPA_PLATFORM=offscreen $(QGIS_PYTHON) scripts/render_tiles.py \
 	--project $(PROJECT) --out $(TILE_DIR) --version $(TILE_VERSION)
 
-.PHONY: all dem tiles sample waternames $(TILESETS) clean distclean \
+.PHONY: all dem tiles sample samples waternames $(TILESETS) clean distclean \
 	apply-styles export-styles export-styles-force
 
 all: tiles
@@ -257,6 +257,10 @@ sample: $(DATA_FILES) $(WATERNAMES_JSON) data/transport.gpkg data/roads.gpkg dat
 	for t in $(TILESETS); do \
 		$(RENDER) --tileset $$t --extent=$(SAMPLE_BBOX) --zmin $(SAMPLE_ZMIN) --zmax $(SAMPLE_ZMAX) || exit 1; \
 	done
+
+# Sample images for the README (docs/samples), from the data in data/
+samples:
+	QT_QPA_PLATFORM=offscreen $(QGIS_PYTHON) scripts/make_samples.py
 
 # ---------------------------------------------------------------------------
 # Housekeeping

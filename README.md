@@ -10,20 +10,32 @@ without opening QGIS.
 Each build goes in a version directory (`<version>` below): `dev` by default, or
 the release tag for release builds (`make TILE_VERSION=v1.2 ...`).
 
-Three tile sets are produced, matching the layers in the site's Leaflet map:
+Each layer is a separate set of transparent tiles (apart from the topology, which is opaque),
+so a map can switch them on and off. A good stacking order, bottom to top, is topology, roads,
+paths, rivers, loch names, railways, shelters, facilities, hills, trig points. The zoom a feature
+first appears at is described under each layer's section further down.
 
-| Tile set   | Contents                                                              | Path                                   |
-|------------|-----------------------------------------------------------------------|----------------------------------------|
-| `topology` | Hypsometric tints, hillshade, contours, OSM water and forest          | `data/tiles/topology/<version>/{z}/{x}/{y}.png` |
-| `dbobih`   | Hill markers, names and heights (transparent)                         | `data/tiles/dbobih/<version>/{z}/{x}/{y}.png`   |
-| `trigs`    | Ordnance Survey trig points (transparent)                             | `data/tiles/trigs/<version>/{z}/{x}/{y}.png`    |
-| `transport` | Railways (one solid dark grey line) and stations (dark circles with names) (transparent) | `data/tiles/transport/<version>/{z}/{x}/{y}.png` |
-| `roads` | Main roads as thin grey lines, quieter than the railways (transparent) | `data/tiles/roads/<version>/{z}/{x}/{y}.png` |
-| `paths` | Footpaths, bridleways and tracks for walkers, from zoom 12 (transparent) | `data/tiles/paths/<version>/{z}/{x}/{y}.png` |
-| `rivers` | Rivers, streams and canals with names along them, and waterfalls (transparent) | `data/tiles/rivers/<version>/{z}/{x}/{y}.png` |
-| `facilities` | Car parks, campsites, hostels, toilets, viewpoints, visitor centres, rescue posts and ferries (transparent) | `data/tiles/facilities/<version>/{z}/{x}/{y}.png` |
-| `shelters` | Bothies (blue discs) and shelters (hollow discs) with names (transparent) | `data/tiles/shelters/<version>/{z}/{x}/{y}.png` |
-| `waternames` | Names of lochs and reservoirs: label lines as GeoJSON (vector), drawn in the browser | `data/tiles/waternames/<version>/water-names.geojson` |
+| Layer | Sample |
+|---|---|
+| **Topology** (`topology`)<br><br>Terrain, drawn as hypsometric tints with soft hillshade, 50 m contours, water and forest. Below 200 m the tints run from pale green to beige so hills show in flat country; above that they step through tan to brown. Zoom 9–13. Data: SRTM-derived DEM, OpenStreetMap. | <img src="docs/samples/topology.png" width="420" alt="Topology"> |
+| **Hills** (`dbobih`)<br><br>Hill markers with names and heights from the Database of British and Irish Hills, as a transparent overlay. Zoom 9–13. Data: DoBIH. | <img src="docs/samples/dbobih.png" width="420" alt="Hills"> |
+| **Trig points** (`trigs`)<br><br>Ordnance Survey triangulation pillars, as a transparent overlay. Zoom 9–13. Data: `sources/trigs.csv`. | <img src="docs/samples/trigs.png" width="420" alt="Trig points"> |
+| **Roads** (`roads`)<br><br>A deliberately quiet layer of thin grey lines. Zoomed out only motorways, trunk and primary roads show; smaller roads join as you zoom in, down to residential streets at zoom 13. Data: OpenStreetMap. | <img src="docs/samples/roads.png" width="420" alt="Roads"> |
+| **Railways and stations** (`transport`)<br><br>Every railway as one solid dark grey line, with stations as dark circles and their names. Sidings and yards are left out. Draw it above the roads. Data: OpenStreetMap. | <img src="docs/samples/transport.png" width="420" alt="Railways and stations"> |
+| **Paths** (`paths`)<br><br>Footpaths, bridleways and tracks from zoom 12, as light, thin lines: white dashes for paths and light grey lines for tracks. Dash pattern shows `sac_scale` difficulty and faint trails. Data: OpenStreetMap. | <img src="docs/samples/paths.png" width="420" alt="Paths"> |
+| **Rivers and waterfalls** (`rivers`)<br><br>Rivers, streams and canals in the same pale blue as the base map's water, with named rivers and burns labelled along the line, and waterfalls as blue triangles. Data: OpenStreetMap. | <img src="docs/samples/rivers.png" width="420" alt="Rivers and waterfalls"> |
+| **Loch names** (`waternames`)<br><br>The name of each loch and reservoir, curved along its main axis. Unlike the other layers this is vector data (GeoJSON) drawn in the browser by `preview/water-names.js`, so the text is sharp and uses the page's fonts. Data: OpenStreetMap. | <img src="docs/samples/waternames.png" width="420" alt="Loch names"> |
+| **Bothies and shelters** (`shelters`)<br><br>Bothies as solid blue discs, visible at every zoom, and shelters as smaller hollow discs from zoom 12, with names. Data: OpenStreetMap. | <img src="docs/samples/shelters.png" width="420" alt="Bothies and shelters"> |
+| **Trailheads and facilities** (`facilities`)<br><br>Car parks, campsites, hostels, visitor centres, viewpoints, mountain rescue posts, toilets and ferry terminals as small coloured symbols, plus ferry routes. Data: OpenStreetMap. | <img src="docs/samples/facilities.png" width="420" alt="Trailheads and facilities"> |
+
+The samples were made with `make samples` (the loch names sample is a screenshot of
+`preview/index.html`). The railway, road, path, river, loch name, shelter and facility samples were
+made while developing the layers with stand-in data (OpenStreetMap-derived tiles and a few example
+points) rather than a full OSM extract, so replace them with `make samples` once the real data
+has been built.
+
+Tiles are written to `data/tiles/<layer>/<version>/{z}/{x}/{y}.png` (the loch names are
+`data/tiles/waternames/<version>/water-names.geojson`).
 
 ## Data sources
 

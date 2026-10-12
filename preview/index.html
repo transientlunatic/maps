@@ -23,7 +23,9 @@
   const tiles = `../data/tiles`;
   const options = { minZoom: 9, maxZoom: 13 };
 
-  const map = L.map('map').setView([56.2, -4.5], 11);
+  // Optional ?lat=&lng=&z= start the map somewhere else
+  const q = new URLSearchParams(location.search);
+  const map = L.map('map').setView([+(q.get('lat') || 56.2), +(q.get('lng') || -4.5)], +(q.get('z') || 11));
   const topology = L.tileLayer(`${tiles}/topology/${version}/{z}/{x}/{y}.png`, options).addTo(map);
   const hills = L.tileLayer(`${tiles}/dbobih/${version}/{z}/{x}/{y}.png`, options).addTo(map);
   const trigs = L.tileLayer(`${tiles}/trigs/${version}/{z}/{x}/{y}.png`, options);
