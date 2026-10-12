@@ -24,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        tileset: [topology, dbobih, trigs]
+        tileset: [topology, dbobih, trigs, waternames]
 
     env:
       # Full builds only happen on a release, and the release tag becomes the
@@ -37,6 +37,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           lfs: true
+
+      - name: Get the current month (cache key)
+        id: month
+        run: echo "month=$(date +%Y-%m)" >> "$GITHUB_OUTPUT"
 
       # The project was saved with a recent QGIS and the Ubuntu package is
       # too old to render it faithfully, so use the QGIS LTR repository.
@@ -54,7 +58,15 @@ jobs:
             'Signed-By: /etc/apt/keyrings/qgis-archive-keyring.gpg' \
             | sudo tee /etc/apt/sources.list.d/qgis.sources
           sudo apt-get update
-          sudo apt-get install -y qgis python3-qgis qgis-providers gdal-bin fonts-lato fonts-inter curl unzip
+          sudo apt-get install -y qgis python3-qgis qgis-providers gdal-bin python3-gdal python3-shapely python3-scipy python3-numpy fonts-lato fonts-inter curl unzip
+
+      # The OSM extract changes slowly, so reuse it for a month
+      - name: Cache OSM extract
+        if: matrix.tileset == 'waternames'
+        uses: actions/cache@v4
+        with:
+          path: data/scotland.osm.pbf
+          key: osm-scotland-${{ steps.month.outputs.month }}
 
       # Only the topology tiles need the elevation data
       - name: Build DEM, hillshade and contours

@@ -17,6 +17,7 @@ Three tile sets are produced, matching the layers in the site's Leaflet map:
 | `topology` | Hypsometric tints, hillshade, contours, OSM water and forest          | `data/tiles/topology/<version>/{z}/{x}/{y}.png` |
 | `dbobih`   | Hill markers, names and heights (transparent)                         | `data/tiles/dbobih/<version>/{z}/{x}/{y}.png`   |
 | `trigs`    | Ordnance Survey trig points (transparent)                             | `data/tiles/trigs/<version>/{z}/{x}/{y}.png`    |
+| `waternames` | Names of lochs and reservoirs, curved along each loch's main axis (transparent) | `data/tiles/waternames/<version>/{z}/{x}/{y}.png` |
 
 ## Data sources
 
@@ -26,6 +27,9 @@ Three tile sets are produced, matching the layers in the site's Leaflet map:
   service referenced in the project, so rendering needs internet access.
 - **Hills**: `sources/dobih.csv`, the [Database of British and Irish Hills](https://www.hills-database.co.uk).
 - **Trig points**: `sources/trigs.csv`.
+- **Water names**: the named water polygons in the OpenStreetMap
+  [Geofabrik extract for Scotland](https://download.geofabrik.de/europe/united-kingdom/scotland.html)
+  (about 300 MB, downloaded to `data/scotland.osm.pbf`).
 
 ## Prerequisites
 
@@ -33,6 +37,8 @@ Three tile sets are produced, matching the layers in the site's Leaflet map:
 - Fonts: Lato (hill and trig names) and Inter (heights and other labels), e.g.
   `fonts-lato fonts-inter` on Ubuntu
 - GDAL command-line tools (`gdalbuildvrt`, `gdal_translate`, `gdaldem`, `gdal_contour`)
+- Python with `shapely`, `scipy`, `numpy` and the GDAL bindings, for the water name lines
+  (`python3-shapely python3-scipy python3-numpy python3-gdal` on Ubuntu)
 - QGIS **3.40 or newer** with its Python bindings. The project was saved with QGIS 3.38,
   and the older QGIS 3.34 in Ubuntu 24.04 renders rasters blocky, so on Ubuntu use the
   [QGIS LTR repository](https://qgis.org/resources/installation-guide/#debianubuntu).
@@ -69,6 +75,19 @@ The topology tiles are slow to render, because QGIS fetches the OSM vector tiles
 and renders every tile. Scotland at zoom 13 is roughly 40,000 tiles per tile set, so
 a full build is a many-hour job. The release workflow builds each tile set in its own
 job to stay inside GitHub's per-job limit.
+
+## Water names
+
+The names of lochs are placed along each loch's main axis. `scripts/water_centerlines.py`
+takes the named OSM water polygons and, for each one, finds the longest path through its
+medial axis, so the line follows a winding loch rather than cutting across it. It then
+smooths the line (written to `data/water-names.gpkg`) so QGIS can curve a label along it.
+The style, with larger and more widely spaced letters for longer lochs, is
+`styling/Water Names.qml`; to tune it, open `data/water-names.gpkg` in QGIS, load the
+style and re-save it.
+
+Lochs that are arms of the sea (Loch Fyne, Loch Linnhe and so on) have no water polygon in
+OSM, so they are not labelled by this layer.
 
 ## Editing the styling
 

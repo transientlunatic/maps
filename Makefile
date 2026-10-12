@@ -8,6 +8,7 @@
 #   data/tiles/topology/<version>/{z}/{x}/{y}.png   terrain, contours, water, forest
 #   data/tiles/dbobih/<version>/{z}/{x}/{y}.png     hill markers and names
 #   data/tiles/trigs/<version>/{z}/{x}/{y}.png      trig points
+#   data/tiles/waternames/<version>/{z}/{x}/{y}.png names of lochs, along their axes
 #
 # Quick start:   make sample     (one small area, a few zoom levels)
 #                make tiles      (all of Scotland, zooms 9-13; slow)
@@ -38,9 +39,12 @@ SAMPLE_ZMAX ?= 12
 # Version directory in the tile URLs; releases set this to the release tag
 TILE_VERSION ?= dev
 TILE_DIR     ?= data/tiles
-TILESETS     := topology dbobih trigs
+TILESETS     := topology dbobih trigs waternames
 
 PROJECT ?= projects/basemap.qgz
+
+# OpenStreetMap extract used for the names of lochs and other bodies of water.
+OSM_PBF_URL ?= https://download.geofabrik.de/europe/united-kingdom/scotland-latest.osm.pbf
 
 # Python interpreter that can `import qgis` (on Debian/Ubuntu this is the
 # system python, not a venv).
@@ -92,6 +96,25 @@ data/contours-merged.gpkg: data/merged-dem.tif
 	rm -f $@
 	gdal_contour -b 1 -a ELEV -i $(CONTOUR_INTERVAL) -f GPKG -nln contours $< $@
 
+# ---------------------------------------------------------------------------
+# Water names
+# ---------------------------------------------------------------------------
+
+data/scotland.osm.pbf:
+	mkdir -p $(dir $@)
+	curl -sSfL -o $@.part $(OSM_PBF_URL)
+	mv $@.part $@
+
+# Named water polygons (lochs, reservoirs, wide rivers) from OSM.
+data/water-polygons.gpkg: data/scotland.osm.pbf
+	rm -f $@
+	ogr2ogr -f GPKG $@ $< multipolygons -nln multipolygons -select name \
+		-where "name IS NOT NULL AND (\"natural\" = 'water' OR landuse = 'reservoir')"
+
+# One label line per water body, along its main axis.
+data/water-names.gpkg: data/water-polygons.gpkg scripts/water_centerlines.py
+	$(QGIS_PYTHON) scripts/water_centerlines.py $< $@
+
 dem: data/merged-dem.tif data/hill-shade-merged.tif data/contours-merged.gpkg
 
 # ---------------------------------------------------------------------------
@@ -109,9 +132,12 @@ dbobih: sources/dobih.csv
 trigs: sources/trigs.csv
 	$(RENDER) --tileset trigs --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
 
+waternames: data/water-names.gpkg
+	$(RENDER) --tileset waternames --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
+
 tiles: $(TILESETS)
 
-sample: $(DATA_FILES)
+sample: $(DATA_FILES) data/water-names.gpkg
 	for t in $(TILESETS); do \
 		$(RENDER) --tileset $$t --extent=$(SAMPLE_BBOX) --zmin $(SAMPLE_ZMIN) --zmax $(SAMPLE_ZMAX) || exit 1; \
 	done
@@ -122,7 +148,8 @@ sample: $(DATA_FILES)
 
 clean:
 	rm -rf data/tiles data/merged-dem.tif data/hill-shade-merged.tif \
-		data/contours-merged.gpkg data/merged.vrt
+		data/contours-merged.gpkg data/merged.vrt data/water-polygons.gpkg \
+		data/water-names.gpkg
 
 # Also removes the downloaded DEM zips and unpacked HGT files.
 distclean: clean
