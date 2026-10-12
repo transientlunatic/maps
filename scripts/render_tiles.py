@@ -111,6 +111,22 @@ TILESETS = {
         },
         "transparent": True,
     },
+    # Trailheads and facilities (`make data/facilities.gpkg`): car parks, campsites, hostels,
+    # toilets, viewpoints, visitor centres, ferry terminals and routes, mountain rescue posts.
+    "facilities": {
+        "layers": ["Facilities", "Ferries"],
+        "extra_layers": {
+            "Facilities": {
+                "source": "data/facilities.gpkg|layername=facilities",
+                "style": "styling/Facilities.qml",
+            },
+            "Ferries": {
+                "source": "data/facilities.gpkg|layername=ferries",
+                "style": "styling/Ferries.qml",
+            },
+        },
+        "transparent": True,
+    },
 }
 
 

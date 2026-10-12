@@ -21,6 +21,7 @@ Three tile sets are produced, matching the layers in the site's Leaflet map:
 | `roads` | Main roads as thin grey lines, quieter than the railways (transparent) | `data/tiles/roads/<version>/{z}/{x}/{y}.png` |
 | `paths` | Footpaths, bridleways and tracks for walkers, from zoom 12 (transparent) | `data/tiles/paths/<version>/{z}/{x}/{y}.png` |
 | `rivers` | Rivers, streams and canals with names along them, and waterfalls (transparent) | `data/tiles/rivers/<version>/{z}/{x}/{y}.png` |
+| `facilities` | Car parks, campsites, hostels, toilets, viewpoints, visitor centres, rescue posts and ferries (transparent) | `data/tiles/facilities/<version>/{z}/{x}/{y}.png` |
 | `shelters` | Bothies (blue discs) and shelters (hollow discs) with names (transparent) | `data/tiles/shelters/<version>/{z}/{x}/{y}.png` |
 | `waternames` | Names of lochs and reservoirs: label lines as GeoJSON (vector), drawn in the browser | `data/tiles/waternames/<version>/water-names.geojson` |
 
@@ -169,6 +170,28 @@ their names from zoom 13.
 The topology tiles already draw some water lines from the ESRI OSM service, so this layer
 overlays slightly heavier lines on top of them. Labels and the waterfall markers use a darker
 blue so they stay legible.
+
+## Trailheads and facilities
+
+The `facilities` tile set (`make data/facilities.gpkg`, styled by `styling/Facilities.qml` and
+`styling/Ferries.qml`) marks the places walkers start from and stay at. Areas such as car parks are
+reduced to a point inside them. Zoom is the first zoom each kind is shown at:
+
+| Symbol | What | Zoom | Name shown from |
+|---|---|---|---|
+| blue square with a white P | car parks (not multi-storey, underground, street or private) | 13 | not labelled |
+| green triangle | campsites (`tourism=camp_site`) | 12 | 12 |
+| purple pentagon | hostels (`tourism=hostel`) | 11 | 12 |
+| blue disc with an i | visitor centres | 12 | 13 |
+| white ring with a blue centre | viewpoints | 12 | 13 |
+| red cross | mountain rescue posts | 12 | 13 |
+| grey dot | toilets | 13 | not labelled |
+| dark blue square with an F | ferry terminals | 10 | 11 |
+
+Ferry routes (`route=ferry`) are dashed dark blue lines, labelled along the line from zoom 11.
+The extraction uses `scripts/osmconf.ini`, which has the extra OSM tags as columns.
+
+Bus stops are not included yet.
 
 ## Bothies and shelters
 

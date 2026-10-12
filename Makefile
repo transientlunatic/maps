@@ -13,6 +13,7 @@
 #   data/tiles/shelters/<version>/{z}/{x}/{y}.png   bothies and shelters
 #   data/tiles/paths/<version>/{z}/{x}/{y}.png      footpaths and tracks
 #   data/tiles/rivers/<version>/{z}/{x}/{y}.png     rivers, streams and waterfalls
+#   data/tiles/facilities/<version>/{z}/{x}/{y}.png car parks, campsites, hostels and so on
 #   data/tiles/waternames/<version>/water-names.geojson
 #                                            names of lochs, as lines to label (vector)
 #
@@ -46,7 +47,7 @@ SAMPLE_ZMAX ?= 12
 TILE_VERSION ?= dev
 TILE_DIR     ?= data/tiles
 # Raster tile sets rendered by QGIS; the water names are vector data (below)
-TILESETS     := topology dbobih trigs transport roads shelters paths rivers
+TILESETS     := topology dbobih trigs transport roads shelters paths rivers facilities
 
 PROJECT ?= projects/basemap.qgz
 
@@ -148,6 +149,31 @@ data/rivers.gpkg: data/scotland.osm.pbf
 		hstore_get_value(other_tags, 'height') AS height FROM points \
 		WHERE hstore_get_value(other_tags, 'waterway') = 'waterfall'"
 
+# Trailheads and facilities: car parks, campsites, hostels, toilets, viewpoints, visitor
+# centres, ferry terminals and mountain rescue posts, as points (areas are reduced to a point
+# inside them), and ferry routes as lines. Car parks that are multi-storey, underground, on
+# the street or private are left out. Uses scripts/osmconf.ini so the tags are real columns.
+FACILITY_KIND := CASE \
+	WHEN amenity = 'parking' THEN 'parking' \
+	WHEN tourism = 'camp_site' THEN 'camp' \
+	WHEN tourism = 'hostel' THEN 'hostel' \
+	WHEN amenity = 'toilets' THEN 'toilets' \
+	WHEN tourism = 'viewpoint' THEN 'viewpoint' \
+	WHEN tourism = 'information' THEN 'info' \
+	WHEN amenity = 'ferry_terminal' THEN 'ferry' \
+	ELSE 'rescue' END
+FACILITY_WHERE := (amenity = 'parking' AND COALESCE(parking, '') NOT IN ('multi-storey','underground','street_side','lane','rooftop') \
+	AND COALESCE(access, '') NOT IN ('private','customers','no','permit','delivery')) \
+	OR amenity IN ('toilets','ferry_terminal') OR tourism IN ('camp_site','hostel','viewpoint') \
+	OR (tourism = 'information' AND information = 'visitor_centre') OR emergency = 'mountain_rescue'
+OGR_FAC := ogr2ogr -f GPKG --config OSM_CONFIG_FILE scripts/osmconf.ini -dialect SQLITE
+
+data/facilities.gpkg: data/scotland.osm.pbf scripts/osmconf.ini
+	rm -f $@
+	$(OGR_FAC) $@ $< -nln facilities -sql "SELECT geometry, name, $(FACILITY_KIND) AS kind FROM points WHERE $(FACILITY_WHERE)"
+	$(OGR_FAC) -update -append $@ $< -nln facilities -sql "SELECT ST_PointOnSurface(geometry) AS geometry, name, $(FACILITY_KIND) AS kind FROM multipolygons WHERE $(FACILITY_WHERE)"
+	$(OGR_FAC) -update $@ $< -nln ferries -sql "SELECT geometry, name FROM lines WHERE hstore_get_value(other_tags, 'route') = 'ferry'"
+
 # Footpaths, tracks and bridleways, for walkers. Pavements and crossings (footway=sidewalk,
 # crossing), ways closed to walkers (foot=no) and private ways are left out.
 data/paths.gpkg: data/scotland.osm.pbf
@@ -222,9 +248,12 @@ paths: data/paths.gpkg
 rivers: data/rivers.gpkg
 	$(RENDER) --tileset rivers --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
 
+facilities: data/facilities.gpkg
+	$(RENDER) --tileset facilities --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
+
 tiles: $(TILESETS) waternames
 
-sample: $(DATA_FILES) $(WATERNAMES_JSON) data/transport.gpkg data/roads.gpkg data/shelters.gpkg data/paths.gpkg data/rivers.gpkg
+sample: $(DATA_FILES) $(WATERNAMES_JSON) data/transport.gpkg data/roads.gpkg data/shelters.gpkg data/paths.gpkg data/rivers.gpkg data/facilities.gpkg
 	for t in $(TILESETS); do \
 		$(RENDER) --tileset $$t --extent=$(SAMPLE_BBOX) --zmin $(SAMPLE_ZMIN) --zmax $(SAMPLE_ZMAX) || exit 1; \
 	done
@@ -236,7 +265,7 @@ sample: $(DATA_FILES) $(WATERNAMES_JSON) data/transport.gpkg data/roads.gpkg dat
 clean:
 	rm -rf data/tiles data/merged-dem.tif data/hill-shade-merged.tif \
 		data/contours-merged.gpkg data/merged.vrt data/water-polygons.gpkg \
-		data/water-names.gpkg data/transport.gpkg data/roads.gpkg data/shelters.gpkg data/paths.gpkg data/rivers.gpkg
+		data/water-names.gpkg data/transport.gpkg data/roads.gpkg data/shelters.gpkg data/paths.gpkg data/rivers.gpkg data/facilities.gpkg
 
 # Also removes the downloaded DEM zips and unpacked HGT files.
 distclean: clean
