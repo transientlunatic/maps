@@ -40,7 +40,7 @@ SAMPLES = {
 
 # Data each tile set needs (the topology needs the DEM files)
 NEEDS = {
-    "topology": ["data/merged-dem.tif", "data/hill-shade-merged.tif", "data/contours-merged.gpkg"],
+    "topology": ["data/merged-dem.tif", "data/hill-shade-merged.tif", "data/contours-merged.gpkg", "data/sea.gpkg"],
     "forests": [],
     "mist": ["data/mist.tif"],
     "dbobih": ["sources/dobih.csv"],

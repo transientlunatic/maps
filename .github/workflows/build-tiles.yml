@@ -124,6 +124,7 @@ jobs:
             data/hill-shade-merged.tif
             data/contours-merged.gpkg
             data/mist.tif
+            data/sea.gpkg
             data/transport.gpkg
             data/roads.gpkg
             data/shelters.gpkg

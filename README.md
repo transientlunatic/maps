@@ -280,6 +280,16 @@ unchanged, so mountains look as before. Change `LOW`, `HIGH` or `BREAKS` in the 
 the old ramp, so load `styling/merged-dem.qml` onto the `merged-dem` layer in QGIS (or run
 `make apply-styles` and save) to see the same colours there.
 
+## Coastlines
+
+The project's sea comes from the ESRI OSM service as a coarse polygon that its style blurs, which
+made coastlines soft (and hid how generalised they are). The topology tiles draw a sharper sea
+instead: `scripts/make_sea.py` (`make data/sea.gpkg`) takes the part of the DEM at or below sea
+level (the DEM is 0 over the sea), contours its edge at 0.5 m so the coast follows the shoreline
+to a fraction of a pixel, and lightly smooths it. `styling/Sea.qml` fills it with the project's sea
+colour, and `scripts/render_tiles.py` switches off the project's own sea and beach polygons. Lakes
+and the forest keep their soft edges. The coast is as accurate as the 3 arc second DEM, about 90 m.
+
 ## Valley mist
 
 `make data/mist.tif` (`scripts/make_mist.py`) turns the DEM into a mist density map, which

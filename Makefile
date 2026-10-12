@@ -218,17 +218,21 @@ $(WATERNAMES_JSON): data/water-names.gpkg
 
 waternames: $(WATERNAMES_JSON)
 
+# Sea polygons with a detailed coastline, from the DEM (see scripts/make_sea.py)
+data/sea.gpkg: data/merged-dem.tif scripts/make_sea.py
+	$(QGIS_PYTHON) scripts/make_sea.py $< $@
+
 # Valley mist density, from the DEM (see scripts/make_mist.py)
 data/mist.tif: data/merged-dem.tif scripts/make_mist.py
 	$(QGIS_PYTHON) scripts/make_mist.py $< $@
 
-dem: data/merged-dem.tif data/hill-shade-merged.tif data/contours-merged.gpkg data/mist.tif
+dem: data/merged-dem.tif data/hill-shade-merged.tif data/contours-merged.gpkg data/mist.tif data/sea.gpkg
 
 # ---------------------------------------------------------------------------
 # Tiles (rendered by QGIS)
 # ---------------------------------------------------------------------------
 
-DATA_FILES := data/merged-dem.tif data/hill-shade-merged.tif data/contours-merged.gpkg
+DATA_FILES := data/merged-dem.tif data/hill-shade-merged.tif data/contours-merged.gpkg data/sea.gpkg
 
 topology: $(DATA_FILES)
 	$(RENDER) --tileset topology --extent=$(TILE_BBOX) --zmin $(TILE_ZMIN) --zmax $(TILE_ZMAX)
@@ -290,7 +294,7 @@ samples:
 
 clean:
 	rm -rf data/tiles data/merged-dem.tif data/hill-shade-merged.tif \
-		data/contours-merged.gpkg data/merged.vrt data/mist.tif data/water-polygons.gpkg \
+		data/contours-merged.gpkg data/merged.vrt data/mist.tif data/sea.gpkg data/water-polygons.gpkg \
 		data/water-names.gpkg data/transport.gpkg data/roads.gpkg data/shelters.gpkg data/paths.gpkg data/rivers.gpkg data/facilities.gpkg
 
 # Also removes the downloaded DEM zips and unpacked HGT files.
