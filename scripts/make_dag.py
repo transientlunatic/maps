@@ -21,7 +21,10 @@ The DAG is written to --out (default `condor/`):
     logs/           HTCondor's output, error and log files
 
 It assumes the repository sits on a file system the execute machines share (the jobs run in it,
-read data/ and write to condor/shards/) and that they have QGIS, GDAL and make installed. Build the
+read data/ and write to condor/shards/) and that they have QGIS, GDAL and make installed. The
+easy way is the conda environment in environment.yml: create it on a shared path with
+`scripts/setup_env.sh /shared/path/scotland-maps` and pass `--conda-env /shared/path/scotland-maps`,
+and every job runs inside it. Build the
 data first (`make data-all`, which needs the OSM extract), or add --data to make that the first
 node of the DAG, with --data-requirements if it needs a particular machine. Nothing here needs
 the HTCondor Python bindings; the files are plain text, so check them before submitting.
@@ -57,6 +60,22 @@ def pick_tilesets(spec):
     return [t for t in spec.split(",") if t]
 
 
+def conda_run(args):
+    """Command prefix that runs a command inside the conda environment, or empty."""
+    if not args.conda_env:
+        return ""
+    flag = "" if os.path.basename(args.conda_exe).startswith("micromamba") else " --no-capture-output"
+    return f"{args.conda_exe} run{flag} -p {args.conda_env}"
+
+
+def job_environment(args):
+    """The environment line: values with spaces are single-quoted inside the double quotes."""
+    values = {"QGIS_PYTHON": args.python, "QT_QPA_PLATFORM": "offscreen"}
+    if args.conda_env:
+        values["CONDA_RUN"] = conda_run(args)
+    return '"' + " ".join(f"{k}='{v}'" if " " in v else f"{k}={v}" for k, v in values.items()) + '"'
+
+
 def render_submit(args, out):
     lines = [
         "# Written by scripts/make_dag.py: renders one tile set for one shard.",
@@ -65,7 +84,7 @@ def render_submit(args, out):
         "executable     = scripts/condor_render.sh",
         # Condor's new-style arguments: one double-quoted string, split on spaces
         f'arguments      = "$(tileset) $(shard) $(bbox) {args.version} {args.zmin} {args.zmax} {out}"',
-        f"environment    = \"QGIS_PYTHON={args.python} QT_QPA_PLATFORM=offscreen\"",
+        f"environment    = {job_environment(args)}",
         "getenv         = False",
         "should_transfer_files = NO",
         f"request_cpus   = {args.cpus}",
@@ -86,8 +105,9 @@ def data_submit(args, out):
         "# Written by scripts/make_dag.py: builds the data files the tile sets need, once.",
         "universe       = vanilla",
         f"initialdir     = {REPO}",
-        "executable     = /usr/bin/make",
+        "executable     = scripts/condor_make.sh",
         f"arguments      = \"data-all QGIS_PYTHON={args.python} TILE_BBOX={args.bbox}\"",
+        f"environment    = {job_environment(args)}",
         "should_transfer_files = NO",
         f"request_cpus   = {args.cpus}",
         f"request_memory = {args.memory}",
@@ -113,6 +133,8 @@ def main():
     ap.add_argument("--rows", type=int, default=8, help="shard rows (default 8)")
     ap.add_argument("--out", default="condor", help="directory for the DAG, logs and shards")
     ap.add_argument("--python", default="python3", help="interpreter on the workers that can import qgis")
+    ap.add_argument("--conda-env", help="path of the conda environment (see scripts/setup_env.sh) to run the jobs in")
+    ap.add_argument("--conda-exe", default="conda", help="conda, mamba or micromamba, as the workers can run it (default conda)")
     ap.add_argument("--cpus", type=int, default=1)
     ap.add_argument("--memory", default="8GB")
     ap.add_argument("--disk", default="20GB")

@@ -1,0 +1,26 @@
+# The environment that builds the tiles: QGIS (headless), GDAL with its Python bindings, and the
+# few Python packages the scripts use. Create it once, on a path the HTCondor workers share:
+#
+#   conda env create -f environment.yml -p /shared/path/scotland-maps    # or: micromamba create ...
+#   conda run -p /shared/path/scotland-maps scripts/install_fonts.sh    # Lato, which is not on conda-forge
+#
+# QGIS is pinned to 3.44, the long-term release the project (projects/basemap.qgz) was saved with and
+# the scripts were written for; conda-forge's newest QGIS is 4.x (Qt 6), whose Python API differs.
+name: scotland-maps
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.12
+  - qgis=3.44          # PyQGIS, the processing plugin and the offscreen Qt platform
+  - gdal               # ogr2ogr, gdaldem, gdal_contour, ... and the osgeo Python module
+  - numpy
+  - scipy
+  - shapely >=2
+  - pillow             # scripts/make_samples.py
+  - make               # the Makefile
+  - curl               # downloads (DEM, OSM extract)
+  - unzip
+  - rsync              # scripts/publish_tiles.sh
+  - fontconfig         # lets Qt find the fonts in the environment's fonts/ directory
+  - fonts-conda-ecosystem

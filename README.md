@@ -59,6 +59,27 @@ Tiles are written to `data/tiles/<layer>/<version>/{z}/{x}/{y}.png` (the loch na
 
 ## Prerequisites
 
+### With conda (recommended)
+
+Everything the build needs, apart from the Lato font, is on conda-forge, and `environment.yml`
+lists it: QGIS 3.44 with its Python bindings and processing plugin, GDAL (with the OSM driver),
+numpy, scipy, shapely, Pillow, make, curl, unzip and rsync.
+
+```sh
+scripts/setup_env.sh ~/envs/scotland-maps   # conda, mamba or micromamba; about 700 MB to download
+conda activate ~/envs/scotland-maps         # then run make as below
+```
+
+`setup_env.sh` creates (or updates) the environment, installs Lato into it with
+`scripts/install_fonts.sh` (Lato is not on conda-forge, so it comes from the Google Fonts
+repository) and checks that PyQGIS, GDAL's OSM driver and the font all work. QGIS is pinned to
+3.44, the LTR the project was saved with: conda-forge's newest QGIS is 4.x (Qt 6), whose Python API
+differs from what these scripts use. Tiles rendered in this environment match the Ubuntu QGIS 3.44
+ones to the eye (the topology differs by about 1-5 levels out of 255 per pixel, and the hill names
+and heights are identical).
+
+### Without conda
+
 - GNU Make, `curl`, `unzip`
 - Fonts: Lato (hill and trig names) and Inter (heights and other labels), e.g.
   `fonts-lato fonts-inter` on Ubuntu
@@ -396,14 +417,19 @@ overview but not close-up detail. Put it above the topology and forests and belo
 that are too slow for GitHub Actions:
 
 ```sh
+scripts/setup_env.sh /shared/path/scotland-maps   # the conda environment, once, on a shared path
 make data-all                                  # the data, once (or add --data below)
-python3 scripts/make_dag.py --version v0.1     # the heavy tile sets, 4 x 8 shards each
+python3 scripts/make_dag.py --version v0.1 --conda-env /shared/path/scotland-maps
 condor_submit_dag -usedagdir condor/tiles.dag
 ```
 
 - `--tilesets` is `heavy` (the default), `light`, `all` or a comma separated list. `--cols` and
   `--rows` set the shard grid (the default 4 × 8 makes each shard a quarter the size of the
   workflow's, so each job is shorter); `--retries` sets how often a failed shard is run again.
+- `--conda-env` is the environment from `environment.yml` (see Prerequisites). Every job then runs
+  inside it with `conda run -p <path>`; `--conda-exe` names the program (`conda`, `mamba` or
+  `micromamba`, as the workers can run it), so the workers need only the conda installation and
+  the shared path, not QGIS or GDAL.
 - `--data` makes the first node of the DAG build the data (`make data-all`), and every render node
   its child. `--requirements`, `--data-requirements`, `--cpus`, `--memory` and `--disk` set the jobs'
   needs, and `--python` names the interpreter on the workers that can `import qgis`.
@@ -415,7 +441,8 @@ condor_submit_dag -usedagdir condor/tiles.dag
   `--bbox=-4.5,56.2,-4.2,56.35 --zmax 12 --cols 1 --rows 1`.
 
 It assumes the repository is on a file system the worker machines share, and that they have QGIS,
-GDAL, the Python packages and `make` installed (the same as the workflow's `tiles` job). When the DAG
+GDAL, the Python packages and `make` installed (the same as the workflow's `tiles` job), which
+`--conda-env` provides. When the DAG
 has finished, publish the shards like the workflow does:
 `scripts/publish_tiles.sh condor/shards user@host:/path/`. They are the same
 `<tileset>/<version>/...` archives, so they can also be added to the GitHub release.

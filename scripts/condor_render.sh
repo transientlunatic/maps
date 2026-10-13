@@ -8,7 +8,9 @@
 # for the shard, then a tar.gz with <tileset>/<version>/... in it, which scripts/publish_tiles.sh
 # unpacks. It renders into a directory of its own, so shards never touch each other's files, and
 # it only moves the archive into place when it is complete, so a half-finished one is never seen.
-# Set QGIS_PYTHON to the interpreter that can `import qgis` (default python3).
+# Set QGIS_PYTHON to the interpreter that can `import qgis` (default python3). Set CONDA_RUN to a
+# command prefix such as "conda run --no-capture-output -p /shared/path/scotland-maps" to run make
+# inside the conda environment from environment.yml (scripts/make_dag.py sets it from --conda-env).
 set -euo pipefail
 
 tileset=${1:?usage: condor_render.sh <tileset> <shard> <bbox> <version> <zmin> <zmax> <out dir>}
@@ -23,7 +25,8 @@ mkdir -p "$out/shards"
 work=$(mktemp -d "${TMPDIR:-/tmp}/tiles-${tileset}-${shard}.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 
-make render-"$tileset" \
+# shellcheck disable=SC2086  # CONDA_RUN is a command prefix and is split on purpose
+${CONDA_RUN:-} make render-"$tileset" \
   QGIS_PYTHON="${QGIS_PYTHON:-python3}" TILE_DIR="$work" TILE_VERSION="$version" \
   TILE_BBOX="$bbox" TILE_ZMIN="$zmin" TILE_ZMAX="$zmax"
 
