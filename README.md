@@ -1,4 +1,4 @@
-# Basemap project
+# The Mapa Scotlan
 
 Builds the map tiles for Scotland used at <https://www.daniel-williams.co.uk/map/>.
 
@@ -427,9 +427,11 @@ condor_submit_dag -usedagdir condor/tiles.dag
   `--rows` set the shard grid (the default 4 × 8 makes each shard a quarter the size of the
   workflow's, so each job is shorter); `--retries` sets how often a failed shard is run again.
 - `--conda-env` is the environment from `environment.yml` (see Prerequisites). Every job then runs
-  inside it with `conda run -p <path>`; `--conda-exe` names the program (`conda`, `mamba` or
-  `micromamba`, as the workers can run it), so the workers need only the conda installation and
-  the shared path, not QGIS or GDAL.
+  inside it, activated by `scripts/condor_env.sh`; `--conda-exe` names the program (`conda` or
+  `micromamba`, as the workers can run it, so give an absolute path on a shared file system if it
+  is not on the workers' `PATH`), so the workers need only that program and the shared path, not
+  QGIS or GDAL. (It activates the environment rather than using `micromamba run`, which fails
+  inside an HTCondor job.)
 - `--data` makes the first node of the DAG build the data (`make data-all`), and every render node
   its child. `--requirements`, `--data-requirements`, `--cpus`, `--memory` and `--disk` set the jobs'
   needs, and `--python` names the interpreter on the workers that can `import qgis`.

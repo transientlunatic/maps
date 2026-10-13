@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Run `make` with the given arguments, inside the conda environment if CONDA_RUN is set.
+# Run `make` with the given arguments, inside the conda environment if CONDA_ENV_PATH is set.
 #
 # Usage: scripts/condor_make.sh <make arguments>
 #
-# This is what the data node of the DAG from scripts/make_dag.py runs. CONDA_RUN is a command
-# prefix such as "conda run --no-capture-output -p /shared/path/scotland-maps" (make_dag.py sets it
-# from --conda-env). Without it, make runs in the environment HTCondor gives the job.
+# This is what the data node of the DAG from scripts/make_dag.py runs. CONDA_ENV_PATH and CONDA_TOOL
+# name the environment and the program that activates it (see scripts/condor_env.sh; make_dag.py
+# sets them from --conda-env and --conda-exe). Without them, make runs in the environment HTCondor
+# gives the job.
 set -euo pipefail
-# shellcheck disable=SC2086  # CONDA_RUN is a command prefix and is split on purpose
-exec ${CONDA_RUN:-} make "$@"
+# shellcheck source=scripts/condor_env.sh
+. "$(dirname "$0")/condor_env.sh"
+exec make "$@"
