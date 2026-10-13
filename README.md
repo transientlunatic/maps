@@ -59,6 +59,27 @@ Tiles are written to `data/tiles/<layer>/<version>/{z}/{x}/{y}.png` (the loch na
 
 ## Prerequisites
 
+### With conda (recommended)
+
+Everything the build needs, apart from the Lato font, is on conda-forge, and `environment.yml`
+lists it: QGIS 3.44 with its Python bindings and processing plugin, GDAL (with the OSM driver),
+numpy, scipy, shapely, Pillow, make, curl, unzip and rsync.
+
+```sh
+scripts/setup_env.sh ~/envs/scotland-maps   # conda, mamba or micromamba; about 700 MB to download
+conda activate ~/envs/scotland-maps         # then run make as below
+```
+
+`setup_env.sh` creates (or updates) the environment, installs Lato into it with
+`scripts/install_fonts.sh` (Lato is not on conda-forge, so it comes from the Google Fonts
+repository) and checks that PyQGIS, GDAL's OSM driver and the font all work. QGIS is pinned to
+3.44, the LTR the project was saved with: conda-forge's newest QGIS is 4.x (Qt 6), whose Python API
+differs from what these scripts use. Tiles rendered in this environment match the Ubuntu QGIS 3.44
+ones to the eye (the topology differs by about 1-5 levels out of 255 per pixel, and the hill names
+and heights are identical).
+
+### Without conda
+
 - GNU Make, `curl`, `unzip`
 - Fonts: Lato (hill and trig names) and Inter (heights and other labels), e.g.
   `fonts-lato fonts-inter` on Ubuntu
@@ -99,8 +120,11 @@ python3 -m http.server -d data/tiles 8000
 
 The topology tiles are slow to render, because QGIS fetches the OSM vector tiles
 and renders every tile. Scotland at zoom 13 is roughly 40,000 tiles per tile set, so
-a full build is a many-hour job. The release workflow builds each tile set in its own
-job to stay inside GitHub's per-job limit.
+a full build is a many-hour job. Even split into shards, the heavy tile sets (topology,
+Imhof style, forests, roads, paths and rivers) ran for the whole six hours GitHub allows a job
+and were cancelled, while the light ones (mist, dbobih and the like) took two to four minutes per
+shard. So the release workflow builds only the light tile sets, and the heavy ones are built
+with HTCondor (see [Building the heavy tile sets with HTCondor](#building-the-heavy-tile-sets-with-htcondor)).
 
 ## Water names
 
@@ -282,22 +306,26 @@ what order (it draws the contours above the forest, which the project itself doe
 
 `.github/workflows/build-tiles.yml` builds on:
 
-- **Push to main**: sample tiles for each tile set (the small `SAMPLE_BBOX` area, zooms 9-12).
-- **Release**: full tile sets. The release tag is the version in the tile URLs
-  (`{tileset}/{tag}/{z}/{x}/{y}.png`).
+- **Push to main**: sample tiles for every tile set (the small `SAMPLE_BBOX` area, zooms 9-12).
+- **Release**: the full *light* tile sets (`TILESETS_LIGHT` in the Makefile: mist, elevmist,
+  dbobih, trigs, transport, shelters, facilities, crags and geology). The release tag is the
+  version in the tile URLs (`{tileset}/{tag}/{z}/{x}/{y}.png`). The heavy tile sets
+  (`TILESETS_HEAVY`) are built with HTCondor. To build a different list on a release, set the
+  repository variable `CI_TILESETS` (comma separated).
 - **Manual run**: sample only (version `sample`). Full builds only happen on a release.
 
 The build runs in stages so that rendering, the slow part, is spread over many jobs:
 
 1. **plan** works out the version, the area and the list of jobs.
-2. **data** builds the data files once: the DEM, hillshade and contours, the OSM extracts for the
-   roads, railways, paths, rivers, shelters and facilities, and the loch names (which are vector
-   data, so they are finished here). It shares them with the next stage as an artifact.
+2. **data** builds the data files once (`make data-light` on a release, which is the DEM, the mist,
+   the geology and the OSM extracts for the railways, shelters, facilities and crags; `make
+   data-all` for the sample) and the loch names (which are vector data, so they are finished
+   here). It shares them with the next stage as an artifact.
 3. **tiles** renders every tile set for one *shard* per job, using `make render-<tileset>`.
 4. **release** (releases only) attaches all the shards to the release.
 
-A full build is cut into 2 columns × 4 rows of shards, so 9 tile sets × 8 shards = 72 render jobs
-that run in parallel. Change the grid with the repository variables `SHARD_COLS` and
+A full build is cut into 2 columns × 4 rows of shards, so 9 light tile sets × 8 shards = 72 render
+jobs that run in parallel. Change the grid with the repository variables `SHARD_COLS` and
 `SHARD_ROWS` (Settings → Secrets and variables → Actions → Variables); more shards means shorter
 jobs but more overhead, as each job installs QGIS. Shards follow zoom 9 tile edges
 (`scripts/shards.py`), so the tiles of every zoom fall in exactly one shard and nothing overlaps.
@@ -382,6 +410,42 @@ the ridges above them:
 The constants at the top of the script control this; the colour and strength are in the QML. The
 tile set is faded with zoom (`opacity_by_zoom` in `scripts/render_tiles.py`) so that it hazes the
 overview but not close-up detail. Put it above the topology and forests and below everything else.
+
+## Building the heavy tile sets with HTCondor
+
+`scripts/make_dag.py` writes an HTCondor DAG with one job per tile set and shard, for the tile sets
+that are too slow for GitHub Actions:
+
+```sh
+scripts/setup_env.sh /shared/path/scotland-maps   # the conda environment, once, on a shared path
+make data-all                                  # the data, once (or add --data below)
+python3 scripts/make_dag.py --version v0.1 --conda-env /shared/path/scotland-maps
+condor_submit_dag -usedagdir condor/tiles.dag
+```
+
+- `--tilesets` is `heavy` (the default), `light`, `all` or a comma separated list. `--cols` and
+  `--rows` set the shard grid (the default 4 × 8 makes each shard a quarter the size of the
+  workflow's, so each job is shorter); `--retries` sets how often a failed shard is run again.
+- `--conda-env` is the environment from `environment.yml` (see Prerequisites). Every job then runs
+  inside it with `conda run -p <path>`; `--conda-exe` names the program (`conda`, `mamba` or
+  `micromamba`, as the workers can run it), so the workers need only the conda installation and
+  the shared path, not QGIS or GDAL.
+- `--data` makes the first node of the DAG build the data (`make data-all`), and every render node
+  its child. `--requirements`, `--data-requirements`, `--cpus`, `--memory` and `--disk` set the jobs'
+  needs, and `--python` names the interpreter on the workers that can `import qgis`.
+- Each job runs `scripts/condor_render.sh`, which does what a workflow `tiles` job does: renders one
+  shard with `make render-<tileset>` into a scratch directory and writes
+  `condor/shards/<tileset>-<version>-<shard>.tar.gz`, the same archive the workflow makes.
+- The files are written to `condor/` (ignored by git): `tiles.dag`, `render.sub` (and `data.sub`),
+  `logs/` (one `.out` and `.err` per job) and `shards/`. For a quick check, render a small area:
+  `--bbox=-4.5,56.2,-4.2,56.35 --zmax 12 --cols 1 --rows 1`.
+
+It assumes the repository is on a file system the worker machines share, and that they have QGIS,
+GDAL, the Python packages and `make` installed (the same as the workflow's `tiles` job), which
+`--conda-env` provides. When the DAG
+has finished, publish the shards like the workflow does:
+`scripts/publish_tiles.sh condor/shards user@host:/path/`. They are the same
+`<tileset>/<version>/...` archives, so they can also be added to the GitHub release.
 
 ## Publishing to the tile server
 
