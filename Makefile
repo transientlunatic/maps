@@ -50,8 +50,14 @@ SAMPLE_ZMAX ?= 12
 # Version directory in the tile URLs; releases set this to the release tag
 TILE_VERSION ?= dev
 TILE_DIR     ?= data/tiles
-# Raster tile sets rendered by QGIS; the water names are vector data (below)
-TILESETS     := topology imhof forests mist elevmist dbobih trigs transport roads shelters paths rivers facilities crags geology
+# Raster tile sets rendered by QGIS; the water names are vector data (below).
+# The light ones render in a few minutes per shard, so GitHub Actions builds them on a release.
+# The heavy ones (the full-colour terrain, the ESRI forest tiles and the big line layers) take
+# hours per shard, more than an Actions job is allowed, so build them with HTCondor
+# (scripts/make_dag.py) and publish the result with scripts/publish_tiles.sh.
+TILESETS_LIGHT := mist elevmist dbobih trigs transport shelters facilities crags geology
+TILESETS_HEAVY := topology imhof forests roads paths rivers
+TILESETS       := $(TILESETS_LIGHT) $(TILESETS_HEAVY)
 
 PROJECT ?= projects/basemap.qgz
 
@@ -69,7 +75,7 @@ HILLSHADE_Z     ?= 4
 RENDER = QT_QPA_PLATFORM=offscreen $(QGIS_PYTHON) scripts/render_tiles.py \
 	--project $(PROJECT) --out $(TILE_DIR) --version $(TILE_VERSION)
 
-.PHONY: all dem tiles sample samples waternames $(TILESETS) clean distclean \
+.PHONY: all dem data-light data-all tiles sample samples waternames $(TILESETS) clean distclean \
 	apply-styles export-styles export-styles-force
 
 all: tiles
@@ -272,6 +278,16 @@ data/mist.tif: data/merged-dem.tif scripts/make_mist.py
 
 dem: data/merged-dem.tif data/hill-shade-merged.tif data/hill-shade-multi.tif data/contours-merged.gpkg data/mist.tif data/sea.gpkg data/imhof-shade-3x.tif
 
+# The data the light tile sets need, and all of it. `data-light` is what a release build on
+# GitHub Actions makes; the sample build and the heavy tile sets need `data-all`.
+DATA_LIGHT := data/merged-dem.tif data/mist.tif data/transport.gpkg data/shelters.gpkg \
+	data/facilities.gpkg data/crags.gpkg data/geology.tif
+DATA_ALL   := $(DATA_LIGHT) data/hill-shade-merged.tif data/hill-shade-multi.tif data/contours-merged.gpkg \
+	data/sea.gpkg data/imhof-shade-3x.tif data/roads.gpkg data/paths.gpkg data/rivers.gpkg
+
+data-light: $(DATA_LIGHT)
+data-all: $(DATA_ALL)
+
 # ---------------------------------------------------------------------------
 # Tiles (rendered by QGIS)
 # ---------------------------------------------------------------------------
@@ -325,7 +341,7 @@ facilities: data/facilities.gpkg
 
 tiles: $(TILESETS) waternames
 
-sample: $(DATA_FILES) $(WATERNAMES_JSON) data/transport.gpkg data/roads.gpkg data/shelters.gpkg data/paths.gpkg data/rivers.gpkg data/facilities.gpkg data/crags.gpkg
+sample: $(DATA_FILES) $(WATERNAMES_JSON) data/transport.gpkg data/roads.gpkg data/shelters.gpkg data/paths.gpkg data/rivers.gpkg data/facilities.gpkg data/crags.gpkg data/mist.tif data/geology.tif
 	for t in $(TILESETS); do \
 		$(RENDER) --tileset $$t --extent=$(SAMPLE_BBOX) --zmin $(SAMPLE_ZMIN) --zmax $(SAMPLE_ZMAX) || exit 1; \
 	done

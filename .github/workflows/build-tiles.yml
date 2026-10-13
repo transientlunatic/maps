@@ -23,11 +23,19 @@ on:
 #   publish  copy the tiles to the tile server over ssh (releases only)
 # A full build is cut into SHARD_COLS x SHARD_ROWS shards (repository variables, 2 x 4 by
 # default). Shards follow zoom 9 tile edges, so their tiles never overlap.
+#
+# A release builds only the light tile sets (TILESETS_LIGHT in the Makefile), which take minutes
+# per shard. The heavy ones (the topology, Imhof style, forests and the big line layers) run for
+# hours per shard, longer than a job is allowed, so they are built with HTCondor instead: see
+# scripts/make_dag.py and the README. Set the repository variable CI_TILESETS (comma separated)
+# to build a different list here. Pushes to main build every tile set, but only for the small
+# sample area.
 jobs:
   plan:
     runs-on: ubuntu-latest
     outputs:
       mode: ${{ steps.plan.outputs.mode }}
+      data: ${{ steps.plan.outputs.data }}
       version: ${{ steps.plan.outputs.version }}
       zmax: ${{ steps.plan.outputs.zmax }}
       matrix: ${{ steps.plan.outputs.matrix }}
@@ -42,24 +50,34 @@ jobs:
           SHARD_ROWS: ${{ vars.SHARD_ROWS || 4 }}
           EVENT: ${{ github.event_name }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
+          CI_TILESETS: ${{ vars.CI_TILESETS }}
         run: |
-          tilesets=$(make -s print-TILESETS | tr ' ' ',')
           if [ "$EVENT" = "release" ]; then
             # The release tag becomes the version directory in the tile URLs:
             # {tileset}/{tag}/{z}/{x}/{y}.png
             mode=full
+            if [ -n "$CI_TILESETS" ]; then
+              tilesets="$CI_TILESETS"
+              data=data-all   # the list may include heavy tile sets
+            else
+              tilesets=$(make -s print-TILESETS_LIGHT | tr ' ' ',')
+              data=data-light
+            fi
             version="$RELEASE_TAG"
             zmax=$(make -s print-TILE_ZMAX)
             matrix=$(python3 scripts/shards.py --bbox="$(make -s print-TILE_BBOX)" \
               --cols "$SHARD_COLS" --rows "$SHARD_ROWS" --tilesets "$tilesets")
           else
             mode=sample
+            tilesets=$(make -s print-TILESETS | tr ' ' ',')
+            data=data-all
             version=sample
             zmax=$(make -s print-SAMPLE_ZMAX)
             matrix=$(python3 scripts/shards.py --bbox="$(make -s print-SAMPLE_BBOX)" \
               --cols 1 --rows 1 --tilesets "$tilesets")
           fi
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "data=$data" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "zmax=$zmax" >> "$GITHUB_OUTPUT"
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
@@ -101,13 +119,9 @@ jobs:
           path: data/geology.tif
           key: geology-v1
 
-      - name: Build the elevation data
-        run: make dem
-
-      - name: Build the OSM data
-        run: |
-          make data/transport.gpkg data/roads.gpkg data/shelters.gpkg data/paths.gpkg \
-            data/rivers.gpkg data/facilities.gpkg data/crags.gpkg data/geology.tif
+      # A release needs only the data for the light tile sets; the sample needs all of it
+      - name: Build the data
+        run: make ${{ needs.plan.outputs.data }}
 
       # The loch names are vector data, so they are finished here rather than rendered
       - name: Build the loch names
