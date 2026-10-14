@@ -1,4 +1,4 @@
-# The Mapa Scotlan
+# The Mappa Scotlan
 
 Builds the map tiles for Scotland used at <https://www.daniel-williams.co.uk/map/>.
 
