@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hill markers</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,400;0,700&display=swap">
+<style>
+  body { font: 15px/1.4 Lato, sans-serif; margin: 0; padding: 20px 16px 40px; color: #1f2328; background: #fff; }
+  main { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  p.lede { margin: 0 0 18px; color: #55606b; }
+  table { border-collapse: collapse; width: 100%; }
+  th { text-align: left; font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: #55606b; padding: 6px 8px; border-bottom: 2px solid #d0d7de; }
+  td { padding: 7px 8px; border-bottom: 1px solid #e6e9ed; vertical-align: middle; }
+  td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  canvas { display: block; }
+  .swatch { display: flex; gap: 6px; }
+  .on-light { background: #efe9dc; } .on-dark { background: #6d5a49; } .on-green { background: #b9c9a0; }
+  .note { margin-top: 18px; color: #55606b; font-size: .9rem; }
+  @media (max-width: 560px) { .hide-sm { display: none; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Hill markers</h1>
+  <p class="lede">Each hill is drawn as the most important list it is on. The markers for the lists the tile layer already
+  had are unchanged (a circle for a Corbett, a hexagon for a Graham, and so on; hollow means a top, a subsidiary summit
+  on the same hill). The rows marked <b>new</b> are for lists that had no marker. Shown on light, dark and green ground,
+  at 1&times; and 2&times;.</p>
+  <table id="table">
+    <thead><tr><th>Marker</th><th>List</th><th class="hide-sm">Codes</th><th class="n">Hills</th><th class="n">From zoom</th><th class="n">Named from</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <p class="note">A hill on several lists takes the first one in this table, so a Munro that is also a Marilyn is a
+  triangle. <b>From zoom</b> is the first map zoom that draws it; <b>Named from</b> the first that writes its name.
+  At each zoom a marker or name that would land on a more important one is left out.</p>
+</main>
+<script type="module">
+  import { FAMILIES, drawMarker, familyOf } from './hill-markers.js';
+
+  const q = new URLSearchParams(location.search);
+  const version = q.get('v') || 'dev';
+  let counts = {};
+  try {
+    const data = await (await fetch(`../data/tiles/hills/${version}/hills.json`)).json();
+    for (const h of data.hills) { const f = familyOf(h[5]).id; counts[f] = (counts[f] || 0) + 1; }
+  } catch (e) { /* the counts are optional */ }
+
+  const body = document.querySelector('tbody');
+  const dpr = window.devicePixelRatio || 1;
+  for (const f of FAMILIES) {
+    const tr = document.createElement('tr');
+    const cell = document.createElement('td');
+    const row = document.createElement('div');
+    row.className = 'swatch';
+    for (const [bg, scale] of [['on-light', 1], ['on-dark', 1], ['on-green', 1], ['on-light', 2]]) {
+      const c = document.createElement('canvas');
+      const w = 44, h = 36;
+      c.width = w * dpr; c.height = h * dpr; c.style.width = w + 'px'; c.style.height = h + 'px';
+      c.className = bg;
+      const ctx = c.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      drawMarker(ctx, f, w / 2, h / 2, scale);
+      row.appendChild(c);
+    }
+    cell.appendChild(row);
+    tr.appendChild(cell);
+    for (const [text, cls] of [
+      [f.label + (f.isNew ? '  (new)' : ''), ''], [f.lists.join(', ') || 'none of the above', 'hide-sm'],
+      [(counts[f.id] || 0).toLocaleString('en-GB'), 'n'], [f.minZoom, 'n'], [f.labelZoom > 13 ? 'never' : f.labelZoom, 'n'],
+    ]) {
+      const td = document.createElement('td');
+      td.textContent = text; if (cls) td.className = cls;
+      tr.appendChild(td);
+    }
+    body.appendChild(tr);
+  }
+</script>
+</body>
+</html>

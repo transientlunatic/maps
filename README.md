@@ -23,6 +23,7 @@ first appears at is described under each layer's section further down.
 | **Valley mist** (`mist`)<br><br>A pale blue haze that collects on valley floors in rugged country and thins up the slopes, after Eduard Imhof's aerial perspective: valleys recede and the summits stand out. Strongest zoomed out and fading as you zoom in (gone by zoom 13). Data: derived from the DEM. | <img src="docs/samples/mist.png" width="420" alt="Valley mist"> |
 | **Elevation mist** (`elevmist`)<br><br>A pale blue mist that is thickest at sea level and thins steadily to nothing at 914 m (3,000 ft), as a transparent overlay for the topology tiles (the Imhof style already has it). It fades as you zoom in. Data: the DEM. | <img src="docs/samples/elevmist.png" width="420" alt="Elevation mist"> |
 | **Hills** (`dbobih`)<br><br>Hill markers with names and heights from the Database of British and Irish Hills, as a transparent overlay. Zoom 9–13. Data: DoBIH. | <img src="docs/samples/dbobih.png" width="420" alt="Hills"> |
+| **Hills, drawn in the browser** (`hills`)<br><br>The same hills as a JSON file that the map draws as markers and names on a canvas ([`preview/hills.js`](preview/hills.js)): crisp at any pixel density, names in the page's own font, hover and click for height, drop and lists, and each list can be switched on and off. All 13,000 hills in the tile area, not only the listed ones. See [Hills in the browser](#hills-in-the-browser). | <img src="docs/samples/hills.png" width="420" alt="Hills drawn in the browser"> |
 | **Trig points** (`trigs`)<br><br>Ordnance Survey triangulation pillars, as a transparent overlay. Zoom 9–13. Data: `sources/trigs.csv`. | <img src="docs/samples/trigs.png" width="420" alt="Trig points"> |
 | **Roads** (`roads`)<br><br>A deliberately quiet layer of thin grey lines. Zoomed out only motorways, trunk and primary roads show; smaller roads join as you zoom in, down to residential streets at zoom 13. Data: OpenStreetMap. | <img src="docs/samples/roads.png" width="420" alt="Roads"> |
 | **Railways and stations** (`transport`)<br><br>Every railway as one solid dark grey line, with stations as dark circles and their names. Sidings and yards are left out. Draw it above the roads. Data: OpenStreetMap. | <img src="docs/samples/transport.png" width="420" alt="Railways and stations"> |
@@ -270,6 +271,38 @@ shaded slopes. Cliff coverage in OSM is patchy, so this shows only what has been
 slope-derived layer from the DEM could fill the gaps (the 90 m DEM is coarse for single crags).
 The sample was made from the ESRI OSM tiles, because the OSM extract was not available when it was
 made, so its tile edges show as straight lines; the real extract will not have them.
+
+## Hills in the browser
+
+`make hills` writes `hills/<version>/hills.json` from `sources/dobih.csv` (`scripts/make_hills.py`):
+one compact record per hill in the tile area, with its position, name, height, drop and the codes of
+the lists it is on. It is 0.8 MB, or 275 kB compressed, for the 13,000 hills in the area. The
+browser draws it (`preview/hills.js`, a Leaflet layer with a canvas, which also shows how to use it
+from another page) instead of the `dbobih` tiles:
+
+- **Crisp and interactive.** Markers and names are drawn at the screen's pixel density in the page's
+  own font. Hovering a hill shows its name and height, and clicking opens its height in feet, drop,
+  lists and a link to its hill-bagging.co.uk page. `setFamilies([...])` shows only some lists, so
+  the map's layer panel can have a switch per list.
+- **Every hill, not only the listed ones.** The tiles drew the main lists (and, close up, anything
+  else in the database). The file has every hill, and the zoom at which each kind appears is set in
+  `preview/hill-markers.js`.
+- **Names that fit.** Hills are placed most important first, and a marker or name that would land on
+  one already placed is left out, which is done in the browser for the screen being shown.
+- **Nothing to render.** It is built in the data job in a second, and published as `hills-<tag>.tar.gz`
+  next to the loch names.
+
+**Markers.** `preview/hill-markers.html` shows the whole set ([picture](docs/samples/hill-markers.png)).
+The markers for the lists the tiles already had are the same ones, taken from
+`styling/Database of British and Irish Hills.qml`: a triangle for a Munro, a circle for a Corbett, a
+hexagon for a Graham, a diamond for a Donald, a pentagon for a Wainwright, and a hollow version of
+each for its tops. Two differences: the Donald top and the former Munro top, which the style draws
+in white with no outline (so they are hard to see), have a dark outline like the other tops. The
+lists that had no marker use the shapes that were free: a square for a Marilyn (hollow for a HuMP),
+a cross for a Simm, a hollow pentagon for a Hewitt or Nuttall, and a small grey dot for a hill on none
+of them. A hill takes the marker of the most important list it is on.
+
+The `dbobih` tiles are still built; they can go once the blog uses the hills file.
 
 ## Bothies and shelters
 
