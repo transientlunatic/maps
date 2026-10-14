@@ -40,6 +40,17 @@ export const FAMILIES = [
   { id: 'other', label: 'Other hill', lists: [], shape: 'dot', color: GREY, size: 1.5, minZoom: 13, labelZoom: 99, isNew: true },
 ];
 
+// The families grouped as a visitor would switch them: the lists that go together, with their tops.
+export const FAMILY_GROUPS = [
+  { id: 'munros', label: 'Munros and tops', families: ['munro', 'furth', 'munro-top', 'munro-top-former'] },
+  { id: 'corbetts', label: 'Corbetts and tops', families: ['corbett', 'corbett-top'] },
+  { id: 'grahams', label: 'Grahams and tops', families: ['graham', 'graham-top'] },
+  { id: 'donalds', label: 'Donalds and tops', families: ['donald', 'donald-top'] },
+  { id: 'other-lists', label: 'Wainwrights, Hewitts, Nuttalls, Dillons', families: ['wainwright', 'hewitt-nuttall', 'dillon'] },
+  { id: 'prominence', label: 'Marilyns, HuMPs, Simms', families: ['marilyn', 'hump', 'simm'] },
+  { id: 'other', label: 'Other hills', families: ['other'] },
+];
+
 export const LIST_NAMES = {
   M: 'Munro', MT: 'Munro top', xMT: 'Former Munro top', F: 'Munro Furth', C: 'Corbett', CT: 'Corbett top',
   G: 'Graham', GT: 'Graham top', D: 'Donald', DT: 'Donald top', Dil: 'Dillon', W: 'Wainwright',

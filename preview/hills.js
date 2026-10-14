@@ -14,6 +14,8 @@
 //   import { HillsLayer } from './hills.js';
 //   const hills = new HillsLayer('https://tiles.example.org/hills/v1.0/hills.json').addTo(map);
 //   hills.setFamilies(['munro', 'corbett']);   // optional: only these lists
+//
+// Give the `fallback` option a layer (the old hill tiles, say) to show instead if the file cannot be read.
 
 import { FAMILIES, LIST_NAMES, drawMarker, familyOf, pixelSize } from './hill-markers.js';
 
@@ -59,14 +61,23 @@ export const HillsLayer = L.Layer.extend({
       this._redraw();
     } else {
       this._loaded = fetch(this._url)
-        .then((r) => r.json())
+        .then((r) => {
+          if (!r.ok) throw new Error(`${r.status} for ${this._url}`);
+          return r.json();
+        })
         .then((data) => {
           this._hills = data.hills.map(([lon, lat, name, metres, drop, lists, id, country]) => ({
             latlng: L.latLng(lat, lon), name, metres, drop, lists, id, country, family: familyOf(lists),
           }));
           if (this._map) this._redraw();
+        })
+        .catch((err) => {
+          console.warn('Hills not drawn:', err);
+          this._failed = true;
+          if (this._map && this.options.fallback) this._map.addLayer(this.options.fallback);
         });
     }
+    if (this._failed && this.options.fallback) map.addLayer(this.options.fallback);
   },
 
   onRemove(map) {
@@ -75,6 +86,7 @@ export const HillsLayer = L.Layer.extend({
     map.off('mousemove', this._hover, this);
     map.off('click', this._click, this);
     this._tooltip && this._tooltip.remove();
+    if (this.options.fallback && map.hasLayer(this.options.fallback)) map.removeLayer(this.options.fallback);
     L.DomUtil.remove(this._canvas);
     this._placed = [];
   },
