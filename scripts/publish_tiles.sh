@@ -25,20 +25,23 @@ for archive in "${archives[@]}"; do
   tar -xzf "$archive" -C "$work"
 done
 
-# The loch names are fetched by the browser from another origin (the blog), so the server must
-# allow that and serve the GeoJSON with the right type. The rule lives in the waternames
-# directory, so it does not touch whatever else the server's root holds.
-if [ -d "$work/waternames" ]; then
-  cat > "$work/waternames/.htaccess" <<'HT'
+# The loch names and the hills are fetched by the browser from another origin (the blog), so the
+# server must allow that and serve them with the right type. The rule lives in each of their
+# directories, so it does not touch whatever else the server's root holds.
+for dir in waternames hills; do
+  if [ -d "$work/$dir" ]; then
+    cat > "$work/$dir/.htaccess" <<'HT'
 <IfModule mod_headers.c>
   Header set Access-Control-Allow-Origin "*"
 </IfModule>
 AddType application/geo+json .geojson
+AddType application/json .json
 <IfModule mod_deflate.c>
-  AddOutputFilterByType DEFLATE application/geo+json
+  AddOutputFilterByType DEFLATE application/geo+json application/json
 </IfModule>
 HT
-fi
+  fi
+done
 
 echo "Publishing $(find "$work" -type f | wc -l) files to $dest"
 rsync -rt --info=stats1 "$work"/ "$dest"

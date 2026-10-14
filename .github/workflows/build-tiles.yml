@@ -137,6 +137,20 @@ jobs:
           path: assets/*.tar.gz
           retention-days: ${{ needs.plan.outputs.mode == 'full' && 90 || 30 }}
 
+      # So are the hills, which the browser draws from a JSON file
+      - name: Build the hills
+        run: |
+          make hills
+          tar -C data/tiles -czf hills-${{ env.TILE_VERSION }}.tar.gz hills
+          mkdir -p hill-assets && mv hills-${{ env.TILE_VERSION }}.tar.gz hill-assets/
+
+      - name: Upload the hills
+        uses: actions/upload-artifact@v4
+        with:
+          name: tiles-hills
+          path: hill-assets/*.tar.gz
+          retention-days: ${{ needs.plan.outputs.mode == 'full' && 90 || 30 }}
+
       # Every tile job needs these, so pass them on as one artifact
       - name: Upload the data files
         uses: actions/upload-artifact@v4

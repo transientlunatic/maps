@@ -78,7 +78,7 @@ RENDER = QT_QPA_PLATFORM=offscreen $(QGIS_PYTHON) scripts/render_tiles.py \
 # A recipe that fails must not leave a half-made or empty file behind, which make would then take as up to date
 .DELETE_ON_ERROR:
 
-.PHONY: all dem data-light data-all tiles sample samples waternames $(TILESETS) clean distclean \
+.PHONY: all dem data-light data-all tiles sample samples waternames hills $(TILESETS) clean distclean \
 	apply-styles export-styles export-styles-force
 
 all: tiles
@@ -262,6 +262,14 @@ $(WATERNAMES_JSON): data/water-names.gpkg
 		-lco COORDINATE_PRECISION=5 -lco RFC7946=YES
 
 waternames: $(WATERNAMES_JSON)
+
+# The hills as JSON for the browser, which draws them (see preview/hills.js and scripts/make_hills.py)
+HILLS_JSON := $(TILE_DIR)/hills/$(TILE_VERSION)/hills.json
+
+$(HILLS_JSON): sources/dobih.csv scripts/make_hills.py
+	python3 scripts/make_hills.py --bbox=$(TILE_BBOX) $< $@
+
+hills: $(HILLS_JSON)
 
 # The shading value for the Imhof basemap style (see scripts/make_imhof.py), and a threefold
 # enlarged copy of it, which QGIS draws smoothly where it would show the cells of the original

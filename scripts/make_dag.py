@@ -35,6 +35,7 @@ For a quick check, `--bbox` and `--zmax` render a small area, for example
 import argparse
 import os
 import shlex
+import shutil
 import subprocess
 import sys
 
@@ -64,9 +65,12 @@ def job_environment(args):
     """The environment line: values with spaces are single-quoted inside the double quotes."""
     values = {"QGIS_PYTHON": args.python, "QT_QPA_PLATFORM": "offscreen"}
     if args.conda_env:
-        # scripts/condor_env.sh activates it in the job
-        values["CONDA_ENV_PATH"] = args.conda_env
-        values["CONDA_TOOL"] = args.conda_exe
+        # scripts/condor_env.sh activates it in the job. A job's PATH is minimal, so the conda
+        # program is named by its full path, if there is one; without it the environment is
+        # activated by hand, which needs no program.
+        values["CONDA_ENV_PATH"] = os.path.abspath(args.conda_env)
+        if args.conda_exe:
+            values["CONDA_TOOL"] = args.conda_exe
     return '"' + " ".join(f"{k}='{v}'" if " " in v else f"{k}={v}" for k, v in values.items()) + '"'
 
 
@@ -128,7 +132,9 @@ def main():
     ap.add_argument("--out", default="condor", help="directory for the DAG, logs and shards")
     ap.add_argument("--python", default="python3", help="interpreter on the workers that can import qgis")
     ap.add_argument("--conda-env", help="path of the conda environment (see scripts/setup_env.sh) to run the jobs in")
-    ap.add_argument("--conda-exe", default="conda", help="conda or micromamba (or mamba 2), as the workers can run it (default conda)")
+    ap.add_argument("--conda-exe", help="conda or micromamba (or mamba 2) to activate the environment with: "
+                    "its full path is used, found on the PATH here if only a name is given. Without it the "
+                    "environment is activated directly, which needs no program")
     ap.add_argument("--cpus", type=int, default=1)
     ap.add_argument("--memory", default="8GB")
     ap.add_argument("--disk", default="20GB")
@@ -137,6 +143,15 @@ def main():
     ap.add_argument("--data-requirements", help="HTCondor requirements for the data job")
     ap.add_argument("--retries", type=int, default=2, help="times to retry a failed node")
     args = ap.parse_args()
+
+    if args.conda_exe and not os.path.isabs(args.conda_exe):
+        found = shutil.which(args.conda_exe)
+        if found:
+            args.conda_exe = found
+        else:
+            print(f"Note: {args.conda_exe} is not on the PATH here, so the jobs activate the environment "
+                  "directly (pass --conda-exe /full/path/to/conda to use the program)", file=sys.stderr)
+            args.conda_exe = None
 
     args.bbox = args.bbox or make_var("TILE_BBOX")[0]
     args.zmin = args.zmin if args.zmin is not None else int(make_var("TILE_ZMIN")[0])
