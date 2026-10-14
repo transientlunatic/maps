@@ -302,6 +302,12 @@ lists that had no marker use the shapes that were free: a square for a Marilyn (
 a cross for a Simm, a hollow pentagon for a Hewitt or Nuttall, and a small grey dot for a hill on none
 of them. A hill takes the marker of the most important list it is on.
 
+To publish the hills by hand (they are one JSON file, not shards): `make hills-archive TILE_VERSION=v0.1`
+packs it as `condor/shards/hills-v0.1.tar.gz`, the same kind of archive as a shard, and
+`scripts/publish_tiles.sh condor/shards user@host:/path/` then publishes it with the shards (and adds the
+CORS `.htaccess` to `hills/`). `make waternames-archive` does the same for the loch names. (The workflow's
+data job makes both archives itself.)
+
 The `dbobih` tiles are still built; they can go once the blog uses the hills file.
 
 ## Bothies and shelters
