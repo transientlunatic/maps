@@ -75,6 +75,9 @@ HILLSHADE_Z     ?= 4
 RENDER = QT_QPA_PLATFORM=offscreen $(QGIS_PYTHON) scripts/render_tiles.py \
 	--project $(PROJECT) --out $(TILE_DIR) --version $(TILE_VERSION)
 
+# A recipe that fails must not leave a half-made or empty file behind, which make would then take as up to date
+.DELETE_ON_ERROR:
+
 .PHONY: all dem data-light data-all tiles sample samples waternames $(TILESETS) clean distclean \
 	apply-styles export-styles export-styles-force
 

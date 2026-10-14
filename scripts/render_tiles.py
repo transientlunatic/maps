@@ -351,6 +351,10 @@ def main():
             layer = QgsVectorLayer(extra["source"], name, "ogr")
         if not layer.isValid():
             sys.exit(f"Could not open {extra['source']} (run `make data/transport.gpkg`)")
+        # An empty data file draws nothing and the tiles look fine but wrong (it once left the sea
+        # white), so stop rather than render them
+        if extra.get("type") != "raster" and layer.featureCount() == 0:
+            sys.exit(f"{extra['source']} has no features: delete it and rebuild it with make")
         _, ok = layer.loadNamedStyle(extra["style"])
         if not ok:
             sys.exit(f"Could not load style {extra['style']}")
