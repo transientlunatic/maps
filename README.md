@@ -359,6 +359,13 @@ colour with a light blur (level 0.8, about a third of the project's old blur) so
 rather than mechanical, and `scripts/render_tiles.py` switches off the project's own sea and beach
 polygons. Lakes and the forest keep their soft edges. The coast is as accurate as the 3 arc second DEM, about 90 m.
 
+
+`scripts/make_sea.py` works on GDAL 3.8 and on the 3.13 in the conda environment. GDAL 3.13 leaves
+the open-ended bands out of polygonized contours, so with a single contour level it makes no polygons
+at all, and the sea was drawn white in the first Condor build. The script now asks for the band
+between two levels (-1 m and 0.5 m), which every version keeps, and stops with an error if it finds
+no sea. `make` deletes a target whose recipe fails (`.DELETE_ON_ERROR`), and `render_tiles.py`
+refuses to render from an empty vector file, so a bad data file cannot pass unnoticed again.
 ## The Imhof style
 
 `imhof` is a second basemap, a different way of drawing the same terrain, to use in place of

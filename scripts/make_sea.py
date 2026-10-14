@@ -23,6 +23,7 @@ ogr.UseExceptions()
 osr.UseExceptions()
 
 LEVEL = 0.5            # contour level in metres: below this is sea
+FLOOR = -1.0           # a second level below the sea, so the sea is a band with a bound on both sides
 SIMPLIFY = 0.00003     # degrees, about 3 m: drop vertices that do not change the shape
 CHAIKIN_PASSES = 2     # corner cutting rounds, to take the pixel stair-steps off the coast
 
@@ -63,17 +64,21 @@ def main():
     contours = tmp.CreateLayer("c", srs, ogr.wkbMultiPolygon)
     contours.CreateField(ogr.FieldDefn("lo", ogr.OFTReal))
     contours.CreateField(ogr.FieldDefn("hi", ogr.OFTReal))
+    # The sea is the band between FLOOR and LEVEL. GDAL 3.13 and newer leave out the two open-ended
+    # bands (below the lowest level, above the highest) when polygonizing, so a single level gives no
+    # polygons at all; a band with both bounds is kept by every version.
     gdal.ContourGenerateEx(
         mem.GetRasterBand(1), contours,
-        options=[f"FIXED_LEVELS={LEVEL}", "POLYGONIZE=YES", "ELEV_FIELD_MIN=0", "ELEV_FIELD_MAX=1"],
+        options=[f"FIXED_LEVELS={FLOOR},{LEVEL}", "POLYGONIZE=YES", "ELEV_FIELD_MIN=0", "ELEV_FIELD_MAX=1"],
     )
 
     out = ogr.GetDriverByName("GPKG").CreateDataSource(dst)
     layer = out.CreateLayer("sea", srs, ogr.wkbMultiPolygon, ["OVERWRITE=YES"])
     kept = 0
     for feat in contours:
-        # The band below the contour level is the sea
-        if feat.GetField("hi") is None or feat.GetField("hi") > LEVEL:
+        # The band that ends at the contour level is the sea
+        hi = feat.GetField("hi")
+        if hi is None or abs(hi - LEVEL) > 1e-6:
             continue
         geom = shapely.from_wkb(bytes(feat.GetGeometryRef().ExportToWkb()))
         parts = list(geom.geoms) if hasattr(geom, "geoms") else [geom]
@@ -85,6 +90,9 @@ def main():
         kept += 1
     out = None
     print(f"Wrote {dst} ({kept} feature(s))", file=sys.stderr)
+    if kept == 0:
+        # An empty sea would silently draw the sea white, so fail the build instead
+        sys.exit("No sea polygons were found in the DEM")
 
 
 if __name__ == "__main__":
