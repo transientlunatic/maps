@@ -78,7 +78,7 @@ RENDER = QT_QPA_PLATFORM=offscreen $(QGIS_PYTHON) scripts/render_tiles.py \
 # A recipe that fails must not leave a half-made or empty file behind, which make would then take as up to date
 .DELETE_ON_ERROR:
 
-.PHONY: all dem data-light data-all tiles sample samples waternames hills $(TILESETS) clean distclean \
+.PHONY: all dem data-light data-all tiles sample samples waternames hills hills-archive waternames-archive $(TILESETS) clean distclean \
 	apply-styles export-styles export-styles-force
 
 all: tiles
@@ -270,6 +270,19 @@ $(HILLS_JSON): sources/dobih.csv scripts/make_hills.py
 	python3 scripts/make_hills.py --bbox=$(TILE_BBOX) $< $@
 
 hills: $(HILLS_JSON)
+
+# The vector data packed like a tile shard (<name>-<version>.tar.gz holding <name>/<version>/...), so
+# scripts/publish_tiles.sh can publish it from the same directory as the shards: `make hills-archive
+# TILE_VERSION=v0.1`, then `scripts/publish_tiles.sh condor/shards user@host:/path/`.
+ARCHIVE_DIR ?= condor/shards
+
+hills-archive: $(HILLS_JSON)
+	mkdir -p $(ARCHIVE_DIR)
+	tar -C $(TILE_DIR) -czf $(ARCHIVE_DIR)/hills-$(TILE_VERSION).tar.gz hills/$(TILE_VERSION)
+
+waternames-archive: $(WATERNAMES_JSON)
+	mkdir -p $(ARCHIVE_DIR)
+	tar -C $(TILE_DIR) -czf $(ARCHIVE_DIR)/waternames-$(TILE_VERSION).tar.gz waternames/$(TILE_VERSION)
 
 # The shading value for the Imhof basemap style (see scripts/make_imhof.py), and a threefold
 # enlarged copy of it, which QGIS draws smoothly where it would show the cells of the original
